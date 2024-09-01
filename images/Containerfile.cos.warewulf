@@ -9,40 +9,10 @@ COPY ./cos-provision.sh /
 RUN chmod +x /cos-provision.sh && /cos-provision.sh && rm -rf /cos-provision.sh
 
 # Patch up munge key permissions after overlay and before munge starts
-COPY <<EOF /etc/systemd/system/patch-munge-key.service
-[Unit]
-Description=Correct munge permission
-After=network-online.target
-After=wwclient.target
-Before=munge.service
-
-[Service]
-ExecStart=/bin/sh -c "chmod 400 /etc/munge/munge.key && chown munge:munge /etc/munge/munge.key"
-
-[Install]
-WantedBy=multi-user.target
-EOF
+COPY patch-munge-key.service /etc/systemd/system/patch-munge-key.service
 
 # Domain join just before slurm starts so that all jobs will have storage and user
-COPY <<EOF /etc/systemd/system/ipa-add-host.service
-[Unit]
-Description=Add host to IPA
-After=network-online.target
-After=wwclient.target
-Before=slurmd.service
-
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/webhookd_notify_add_host.sh
-Restart=on-failure
-RestartSec=1
-StartLimitIntervalSec=10
-StartLimitBurst=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
+COPY ipa-add-host.service /etc/systemd/system/ipa-add-host.service
 
 # Setup services
 RUN systemctl enable ipa-add-host patch-munge-key munge slurmd && \
@@ -51,18 +21,14 @@ RUN systemctl enable ipa-add-host patch-munge-key munge slurmd && \
 RUN mkdir -p /etc/warewulf/
 
 # Warewulf default excludes
-COPY <<EOF /etc/warewulf/excludes
-/boot/
-/usr/share/GeoIP
-EOF
+RUN echo "/boot/" > /etc/warewulf/excludes && \
+    echo "/usr/share/GeoIP" >> /etc/warewulf/excludes
 
 # Warewulf exit scripts
-COPY <<EOF /etc/warewulf/container_exit.sh
-#!/bin/sh
-export LANG=C LC_CTYPE=C
-set -x
-dnf clean all
-EOF
+RUN echo "#!/bin/sh" > /etc/warewulf/container_exit.sh && \
+    echo "export LANG=C LC_CTYPE=C" >> /etc/warewulf/container_exit.sh && \
+    echo "set -x" >> /etc/warewulf/container_exit.sh && \
+    echo "dnf clean" >> /etc/warewulf/container_exit.sh
 
 # Extract vmlinuz for aarch64 if compressed
 RUN arch=$(uname -m) && \

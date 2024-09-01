@@ -37,7 +37,7 @@ source "qemu" "opnsense" {
   accelerator      = "kvm"
   cpus             = 2
   memory           = 2048
-  disk_size        = 4096
+  disk_size        = 5120
   format           = "qcow2"
   boot_wait        = "5s"
   shutdown_command = "poweroff"

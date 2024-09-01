@@ -1,0 +1,11 @@
+[Unit]
+Description=Correct munge permission
+After=network-online.target
+After=wwclient.target
+Before=munge.service
+
+[Service]
+ExecStart=/bin/sh -c "chmod 400 /etc/munge/munge.key && chown munge:munge /etc/munge/munge.key"
+
+[Install]
+WantedBy=multi-user.target
