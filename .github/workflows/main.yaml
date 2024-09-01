@@ -67,7 +67,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update
-          sudo apt-get install -y --no-install-suggests libvirt-clients libvirt-daemon-system libvirt-daemon virtinst bridge-utils qemu-system-x86 qemu-system-aarch64 qemu-user-static binfmt-support
+          sudo apt-get install -y --no-install-suggests libvirt-clients libvirt-daemon-system libvirt-daemon virtinst bridge-utils qemu-system-x86 qemu-system-aarch64
           sudo usermod -a -G kvm,libvirt $USER
 
       - name: Generate keys
@@ -115,37 +115,38 @@ jobs:
           sudo apt-get update -y 
           sudo apt-get install -y packer vagrant
 
-      - name: Setup vagrant plugin
-        run: vagrant plugin install vagrant-libvirt
+      - name: Setup vagrant plugin and binfmt
+        run: |
+          vagrant plugin install vagrant-libvirt
+          sudo apt-get reinstall -y qemu-user-static
 
       - name: Stats
         run: df -H
 
+      - name: Create all image
+        working-directory: images
+        run: |
+          make all -j
+          rm -rf *.iso
 
-      # - name: Stats
-      #   run: df -H
+      - name: Stats
+        run: df -H
 
-      # - name: Create all image
-      #   working-directory: images
-      #   run: |
-      #     make all -j
-      #     rm -rf *.iso
+      - name: Create proxmox image
+        working-directory: proxmox
+        run: |
+          make build-libvirt
+          vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
+          make clean
 
-      # - name: Create proxmox image
-      #   working-directory: proxmox
-      #   run: |
-      #     make build-libvirt
-      #     vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
-      #     make clean
+      - name: Stats
+        run: df -H
 
-      # - name: Stats
-      #   run: df -H
+      - name: Run provision
+        run: vagrant up
 
-      # - name: Run provision
-      #   run: vagrant up
-
-      # - name: Stats
-      #   run: df -H
+      - name: Stats
+        run: df -H
 
       - name: Wait for SSH
         run: sleep infinity
