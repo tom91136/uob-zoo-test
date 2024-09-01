@@ -67,7 +67,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           sudo apt-get update
-          sudo apt-get install -y --no-install-suggests libvirt-clients libvirt-daemon-system libvirt-daemon virtinst bridge-utils qemu-system-x86 qemu-system-aarch64 qemu-user-static
+          sudo apt-get install -y --no-install-suggests libvirt-clients libvirt-daemon-system libvirt-daemon virtinst bridge-utils qemu-system-x86 qemu-system-aarch64 qemu-user-static binfmt-support
           sudo usermod -a -G kvm,libvirt $USER
 
       - name: Generate keys
