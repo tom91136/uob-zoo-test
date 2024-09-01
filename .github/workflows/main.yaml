@@ -101,7 +101,7 @@ jobs:
       - name: Wait for SSH
         run: |
           sudo sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
-          sudo systemctl restart sshd
+          sudo systemctl restart ssh
            
           printf "%s\n" "${{ secrets.PUBLIC_KEY }}" >> /home/runner/.ssh/authorized_keys
           sudo chown runner:runner /home/runner/.ssh/authorized_keys
