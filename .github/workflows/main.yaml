@@ -121,30 +121,30 @@ jobs:
       - name: Stats
         run: df -H
 
-      - name: Create proxmox image
-        working-directory: proxmox
-        run: |
-          make build-libvirt
-          vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
-          make clean
+      # - name: Create proxmox image
+      #   working-directory: proxmox
+      #   run: |
+      #     make build-libvirt
+      #     vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
+      #     make clean
 
-      - name: Stats
-        run: df -H
+      # - name: Stats
+      #   run: df -H
 
-      - name: Create all image
-        working-directory: images
-        run: |
-          make all -j
-          rm -rf *.iso
+      # - name: Create all image
+      #   working-directory: images
+      #   run: |
+      #     make all -j
+      #     rm -rf *.iso
 
-      - name: Stats
-        run: df -H
+      # - name: Stats
+      #   run: df -H
 
-      - name: Run provision
-        run: vagrant up
+      # - name: Run provision
+      #   run: vagrant up
 
-      - name: Stats
-        run: df -H
+      # - name: Stats
+      #   run: df -H
 
       - name: Wait for SSH
         run: sleep infinity
