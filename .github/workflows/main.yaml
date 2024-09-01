@@ -90,5 +90,5 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:example
 
-      - name: Wait for SSH 
-        uses: sleep infinity
+      - name: Wait for SSH
+        run: sleep infinity
