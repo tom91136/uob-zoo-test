@@ -74,7 +74,7 @@ jobs:
         run: ssh-keygen -t ed25519 -N "" -f $HOME/.ssh/id_ed25519
 
       - name: Install dependencies
-        run: sudo apt-get install -y cloud-utils libvert-dev
+        run: sudo apt-get install -y cloud-utils libvirt-dev
 
       - name: Install packer and vagrant
         run: |

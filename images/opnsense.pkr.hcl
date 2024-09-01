@@ -12,13 +12,9 @@ source "qemu" "opnsense" {
     # navigate installer 
     "<enter><wait>", # select default keymap
     "<down><wait><enter><wait5>", # option 2: Install UFS
-    "<wait500>",
-
     "<enter><wait>", # select disk: vtbd0
-    # confirmation dialog only when disk > 8GB?
-    # "<enter><wait>", # confirm recommended swap partition of 8GB 
-    "<enter><wait><tab><wait><enter>",  # confirm disk data destruction
-    "<wait300>",      # wait for installer to finish
+    "y",             # confirm destroy
+    "<wait300>",     # wait for installer to finish
     "<down><wait><enter>", # option 2: reboot 
     "<wait60>",      # wait for reboot
     # initial boot
