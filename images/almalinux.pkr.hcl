@@ -12,10 +12,28 @@ variable "PACKAGES" {
   type = string
 }
 
-variable "ovmf_suffix" {
+variable "ovmf_code" {
   type        = string
   default     = ""
-  description = "Suffix for OVMF CODE and VARS files. Newer systems such as Noble use _4M."
+  description = "Path to OVMF_CODE file"
+}
+
+variable "ovmf_vars" {
+  type        = string
+  default     = ""
+  description = "Path to OVMF_VARS file"
+}
+
+variable "aavmf_code" {
+  type        = string
+  default     = ""
+  description = "Path to AAVMF_CODE file"
+}
+
+variable "aavmf_vars" {
+  type        = string
+  default     = ""
+  description = "Path to AAVMF_VARS file"
 }
 
 variable "name" {
@@ -23,9 +41,13 @@ variable "name" {
 }
 
 locals {
-  uefi_imp = {
-    "x86_64"  = "OVMF"
-    "aarch64" = "AAVMF"
+  vmf_code_path = {
+    "x86_64"  = "${var.ovmf_code}"
+    "aarch64" = "${var.aavmf_code}"
+  }
+  vmf_vars_path = {
+    "x86_64"  = "${var.ovmf_vars}"
+    "aarch64" = "${var.aavmf_vars}"
   }
   qemu_machine = {
     "x86_64"  = "accel=kvm"
@@ -68,8 +90,8 @@ source "qemu" "almalinux" {
     ["-machine", "${lookup(local.qemu_machine, var.arch, "")}"],
     ["-cpu", "${lookup(local.qemu_cpu, var.arch, "")}"],
     ["-device", "virtio-gpu-pci"],
-    ["-drive", "if=pflash,format=raw,id=ovmf_code,readonly=on,file=/usr/share/${lookup(local.uefi_imp, var.arch, "")}/${lookup(local.uefi_imp, var.arch, "")}_CODE${var.ovmf_suffix}.fd"],
-    ["-drive", "if=pflash,format=raw,id=ovmf_vars,file=output-${var.name}.${var.arch}/${lookup(local.uefi_imp, var.arch, "")}_VARS.fd"],
+    ["-drive", "if=pflash,format=raw,id=ovmf_code,readonly=on,file=${lookup(local.vmf_code_path, var.arch, "")}"],
+    ["-drive", "if=pflash,format=raw,id=ovmf_vars,file=output-${var.name}.${var.arch}/${basename(lookup(local.vmf_vars_path, var.arch, ""))}"],
     ["-drive", "file=output-${var.name}.${var.arch}/${var.name}.${var.arch}.qcow2,format=qcow2"],
     ["-drive", "file=output-${var.name}.${var.arch}/seeds-cloudimg.iso,format=raw"],
   ], lookup(local.qemu_args, var.arch, ""))
@@ -87,7 +109,7 @@ build {
 
   provisioner "shell-local" {
     inline = [
-      "cp /usr/share/${lookup(local.uefi_imp, var.arch, "")}/${lookup(local.uefi_imp, var.arch, "")}_VARS.fd output-${var.name}.${var.arch}/${lookup(local.uefi_imp, var.arch, "")}_VARS.fd",
+      "cp ${lookup(local.vmf_vars_path, var.arch, "")} output-${var.name}.${var.arch}/${basename(lookup(local.vmf_vars_path, var.arch, ""))}",
       "cloud-localds output-${var.name}.${var.arch}/seeds-cloudimg.iso user-data-cloudimg meta-data"
     ]
     inline_shebang = "/bin/bash -e"

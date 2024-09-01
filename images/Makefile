@@ -47,6 +47,10 @@ AlmaLinux-$(ALMA_VERSION_MAJOR)-GenericCloud-$(ALMA_VERSION)-$(ALMA_BUILD).%.qco
 	wget https://repo.almalinux.org/almalinux/$(ALMA_VERSION_MAJOR)/cloud/$*/images/CHECKSUM -O bos-checksums.sha256
 	sha256sum -c bos-checksums.sha256 --ignore-missing
 
+AAVMF_CODE_PATH := $(firstword $(wildcard /usr/share/AAVMF/AAVMF_CODE*.fd))
+AAVMF_VARS_PATH := $(firstword $(wildcard /usr/share/AAVMF/AAVMF_VARS*.fd))
+OVMF_CODE_PATH := $(firstword $(wildcard /usr/share/OVMF/OVMF_CODE*.fd))
+OVMF_VARS_PATH := $(firstword $(wildcard /usr/share/OVMF/OVMF_VARS*.fd))
 
 bos.%.qcow2: export PACKER_LOG = 1
 bos.%.qcow2: AlmaLinux-$(ALMA_VERSION_MAJOR)-GenericCloud-$(ALMA_VERSION)-$(ALMA_BUILD).%.qcow2 almalinux.pkr.hcl bos-provision.sh
@@ -55,6 +59,8 @@ bos.%.qcow2: AlmaLinux-$(ALMA_VERSION_MAJOR)-GenericCloud-$(ALMA_VERSION)-$(ALMA
 	  -var "name=bos" \
 	  -var "image=$<" \
 	  -var "arch=$*" \
+	  -var "ovmf_code=$(OVMF_CODE_PATH)" -var "ovmf_vars=$(OVMF_VARS_PATH)" \
+	  -var "aavmf_code=$(AAVMF_CODE_PATH)" -var "aavmf_vars=$(AAVMF_VARS_PATH)" \
 	  -var "PACKAGES=$(PACKAGES)" \
 	  almalinux.pkr.hcl
 	mv output-bos."$*"/$@ "$@"
@@ -66,6 +72,8 @@ cos.%.qcow2: AlmaLinux-$(ALMA_VERSION_MAJOR)-GenericCloud-$(ALMA_VERSION)-$(ALMA
 	  -var "name=cos" \
 	  -var "image=$<" \
 	  -var "arch=$*" \
+	  -var "ovmf_code=$(OVMF_CODE_PATH)" -var "ovmf_vars=$(OVMF_VARS_PATH)" \
+	  -var "aavmf_code=$(AAVMF_CODE_PATH)" -var "aavmf_vars=$(AAVMF_VARS_PATH)" \
 	  -var "PACKAGES=$(PACKAGES)" \
 	  almalinux.pkr.hcl
 	mv output-cos."$*"/$@ "$@"

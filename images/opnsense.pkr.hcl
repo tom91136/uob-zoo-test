@@ -5,7 +5,7 @@ variable "opnsense_image" {
 source "qemu" "opnsense" {
   boot_command = [
     # boot installer
-    "<wait50>",
+    "<wait60>",
     # login
     "installer<enter><wait>", # user
     "opnsense<enter><wait5>", # password
@@ -16,14 +16,14 @@ source "qemu" "opnsense" {
     # confirmation dialog only when disk > 8GB?
     # "<enter><wait>", # confirm recommended swap partition of 8GB 
     "<tab><enter>",  # confirm disk data destruction
-    "<wait130>",      # wait for installer to finish
+    "<wait160>",      # wait for installer to finish
     "<down><enter>", # option 2: reboot 
-    "<wait45>",      # wait for reboot
+    "<wait60>",      # wait for reboot
     # initial boot
     "root<enter>",                           # user
     "opnsense<enter>",                       # password
     "<wait>8<enter>",                        # select option 8: console
-    "<wait5>dhclient vtnet0<enter><wait10>", # setup dhcp
+    "<wait10>dhclient vtnet0<enter><wait15>", # setup dhcp
     "echo 'PasswordAuthentication yes' >> /usr/local/etc/ssh/sshd_config<enter>",
     "echo 'PermitRootLogin yes' >> /usr/local/etc/ssh/sshd_config<enter>",
     "service openssh onestart<enter><wait>"
@@ -37,7 +37,7 @@ source "qemu" "opnsense" {
   accelerator      = "kvm"
   cpus             = 2
   memory           = 2048
-  disk_size        = 5120
+  disk_size        = 4096
   format           = "qcow2"
   boot_wait        = "5s"
   shutdown_command = "poweroff"
