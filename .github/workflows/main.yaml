@@ -73,18 +73,7 @@ jobs:
       - name: Generate keys
         run: ssh-keygen -t ed25519 -N "" -f $HOME/.ssh/id_ed25519
 
-      - name: Install dependencies
-        run: sudo apt-get install -y cloud-utils libvirt-dev
-
-      - name: Install packer and vagrant
-        run: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update -y 
-          sudo apt-get install -y packer vagrant
-
-      - name: Setup vagrant
-        run: vagrant plugin install vagrant-libvirt
+      ################
 
       - name: Tailscale
         uses: tailscale/github-action@v2
@@ -94,7 +83,7 @@ jobs:
           tags: tag:example
 
       - name: Install tools
-        run: | 
+        run: |
           sudo apt-get install -y tmux micro
           cd
           git clone https://github.com/gpakosz/.tmux.git
@@ -114,4 +103,36 @@ jobs:
           chmod 700 ~/.ssh
           chmod 600 ~/.ssh/authorized_keys
 
-          sleep infinity
+      ################
+
+      - name: Install dependencies
+        run: sudo apt-get install -y cloud-utils libvirt-dev
+
+      - name: Install packer and vagrant
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update -y 
+          sudo apt-get install -y packer vagrant
+
+      - name: Setup vagrant plugin
+        run: vagrant plugin install vagrant-libvirt
+
+      - name: Create proxmox image
+        working-directory: proxmox
+        run: |
+          make build-libvirt
+          vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
+          make clean
+
+      - name: Create all image
+        working-directory: images
+        run: |
+          make all -j
+          rm -rf *.iso
+
+      - name: Run provision
+        run: vagrant up
+
+      - name: Wait for SSH
+        run: sleep infinity
