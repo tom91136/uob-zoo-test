@@ -71,10 +71,13 @@ jobs:
           sudo usermod -a -G kvm,libvirt $USER
 
       - name: Generate keys
-        run: ssh-keygen -t ed25519 -N "" <<< y
+        run: ssh-keygen -t ed25519 -N "" -f $HOME/.ssh/id_ed25519
 
       - name: Install dependencies
-        run: sudo apt-get install -y cloud-utils
+        run: sudo apt-get install -y cloud-utils vagrant libvert-dev
+
+      - name: Setup vagrant
+        run: vagrant plugin install vagrant-libvirt
 
       - name: Install packer
         run: |

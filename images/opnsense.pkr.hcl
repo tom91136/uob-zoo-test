@@ -11,13 +11,15 @@ source "qemu" "opnsense" {
     "opnsense<enter><wait5>", # password
     # navigate installer 
     "<enter><wait>", # select default keymap
-    "<down><enter><wait>", # option 2: Install UFS
+    "<down><wait><enter><wait5>", # option 2: Install UFS
+    "<wait500>",
+
     "<enter><wait>", # select disk: vtbd0
     # confirmation dialog only when disk > 8GB?
     # "<enter><wait>", # confirm recommended swap partition of 8GB 
-    "<tab><enter>",  # confirm disk data destruction
-    "<wait160>",      # wait for installer to finish
-    "<down><enter>", # option 2: reboot 
+    "<enter><wait><tab><wait><enter>",  # confirm disk data destruction
+    "<wait300>",      # wait for installer to finish
+    "<down><wait><enter>", # option 2: reboot 
     "<wait60>",      # wait for reboot
     # initial boot
     "root<enter>",                           # user
@@ -33,7 +35,7 @@ source "qemu" "opnsense" {
   iso_urls     = [var.opnsense_image]
 
   vm_name          = "opnsense.qcow2"
-  headless         = true
+  headless         = false
   accelerator      = "kvm"
   cpus             = 2
   memory           = 2048
