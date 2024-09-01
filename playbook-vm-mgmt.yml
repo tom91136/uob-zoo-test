@@ -1,0 +1,91 @@
+- name: Provision mgmt node
+  hosts: pve
+  become: true
+  vars: { pve_host: localhost }
+  tasks:
+    - include_tasks: tasks/setup_proxmox_api.yml
+    - include_tasks: tasks/setup_backup_dir.yml
+    - include_tasks: tasks/copy_bos_image.yml
+
+    - name: Backup LUKS key
+      ansible.builtin.fetch:
+        flat: true
+        src: /boot/luks.key
+        dest: "{{host_backup_directory}}/luks.key"
+
+    - name: Copy mgmt BOS image
+      ansible.builtin.copy:
+        src: /var/lib/vz/template/bos.x86_64.qcow2
+        dest: "/var/lib/vz/template/bos.x86_64.{{mgmt_disk_size}}.qcow2"
+        force: false
+        remote_src: true
+
+    - name: Resize mgmt image
+      ansible.builtin.shell: "qemu-img resize bos.x86_64.{{mgmt_disk_size}}.qcow2 {{mgmt_disk_size}}"
+      args:
+        chdir: /var/lib/vz/template/
+
+    - include_tasks: tasks/pve_create_vm.yml
+      vars:
+        vm_name: "mgmt.{{domain}}"
+        vm_cores: "{{mgmt_ncores}}"
+        vm_mem_gb: "{{mgmt_mem_gb}}"
+        vm_sshkeys: "{{mgmt_sshkeys | regex_replace('\\\\n', '\n')}}"
+        vm_user: "root"
+        vm_password: "{{mgmt_password}}"
+        vm_nameservers: "{{router_ip}}"
+        vm_ipconfig:
+          ipconfig0: "gw={{router_ip}},ip={{mgmt_ip}}/24"
+        vm_net:
+          net0: "virtio,bridge=vmbr1"
+        vm_scsi:
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{mgmt_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
+          scsi1: "/dev/disk/by-id/{{mgmt_rds_disk_id}},serial=rds1"
+
+    - include_tasks: tasks/pve_vm_state.yml
+      vars: { vm_name: "mgmt.{{domain}}", vm_state: started }
+
+    - include_tasks: tasks/delete_image_templates.yml
+
+- name: Setup rds on mgmt node
+  gather_facts: no
+  hosts: "mgmt.{{domain}}"
+  become: true
+  tasks:
+    - include_tasks: tasks/setup_backup_dir.yml
+    - include_tasks: tasks/backup_or_restore_host_keys.yml
+
+    - name: Wait for mgmt to come online
+      ansible.builtin.wait_for_connection:
+      timeout: 60
+
+    - name: Gather facts after connection
+      ansible.builtin.setup:
+
+    - name: Copy LUKS key
+      ansible.builtin.copy:
+        src: "{{backup_directory}}/pve/luks.key"
+        dest: /boot/luks.key
+        mode: 0600
+
+    - name: Setup rds1 crypttab
+      ansible.builtin.copy:
+        dest: "/etc/crypttab"
+        content: |
+          rds1 /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_rds1-part1 /boot/luks.key luks,nofail
+
+    - name: Setup rds1 mount point
+      ansible.builtin.file:
+        path: /mnt/rds1
+        state: directory
+
+    - name: Setup rds1 fstab
+      ansible.posix.mount:
+        path: /mnt/rds1
+        src: /dev/mapper/rds1
+        opts: nofail,uquota
+        fstype: xfs
+        state: present
+
+    - name: Reboot
+      ansible.builtin.reboot:

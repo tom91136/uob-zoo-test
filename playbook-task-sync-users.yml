@@ -1,0 +1,38 @@
+- name: Sync users
+  hosts: "mgmt.{{domain}}"
+  become: true
+
+  tasks:
+    - name: Query uids
+      command: ipa --no-prompt user-find --raw
+      register: ipa_users
+
+    - name: Extract uids
+      set_fact:
+        existing_users: "{{ipa_users.stdout | regex_findall('(?<=uid: )\\S+')}}"
+
+    - name: "Find absent users"
+      set_fact:
+        users_to_delete: "{{existing_users | difference(users.keys()) | difference(['admin', 'root'])}}"
+
+    - name: Debug and print existing_users
+      debug:
+        var: users_to_delete
+
+    - name: "Drop absent users"
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_password: "{{ipa_password}}"
+        name: "{{item}}"
+        state: absent
+      loop: "{{users_to_delete}}"
+      when: users_to_delete | length > 0 and delete_users | default(false) | bool
+
+    - name: "Import all users"
+      freeipa.ansible_freeipa.ipauser:
+        ipaadmin_password: "{{ipa_password}}"
+        name: "{{item.key}}"
+        first: "{{item.value.first}}"
+        last: "{{item.value.last}}"
+        email: "{{item.value.email}}"
+        sshpubkey: "{{item.value.publickey}}"
+      loop: "{{users | dict2items}}"

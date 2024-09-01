@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -eu
+
+host="$(hostname --short)"
+
+curl -Ss -XPOST "http://mgmt.{{domain}}:{{mgmt_webhook_port}}/webhookd_exec_del_host?host=$host"
+
+exit 0

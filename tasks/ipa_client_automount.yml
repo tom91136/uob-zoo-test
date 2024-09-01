@@ -1,0 +1,12 @@
+- name: Setup client automount
+  ansible.builtin.shell: ipa-client-automount --unattended
+  register: automount
+  ignore_errors: true
+
+- name: Reconfigure client automount (reset)
+  ansible.builtin.command: ipa-client-automount --uninstall
+  when: automount is failed
+
+- name: Reconfigure client automount (install)
+  ansible.builtin.command: ipa-client-automount --unattended
+  when: automount is failed

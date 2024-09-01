@@ -1,0 +1,5 @@
+
+{% for node, vars in nodes.items() %}
+NodeName={{node}} Sockets={{vars.sockets}} CoresPerSocket={{vars.cores_per_socket}} ThreadsPerCore={{vars.threads_per_core}} State=UNKNOWN
+{% endfor %}
+

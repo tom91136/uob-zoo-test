@@ -1,0 +1,360 @@
+- name: Setup OpenHPC slurm+warewulf on mgmt node
+  hosts: "mgmt.{{domain}}"
+  become: true
+
+  pre_tasks:
+    - include_tasks: tasks/setup_backup_dir.yml
+    - include_tasks: tasks/setup_unattended_security_updates.yml
+
+    - name: Setup missing Slurm dependencies
+      ansible.builtin.dnf:
+        name: ["/bin/mailx"]
+
+  roles:
+    - role: linux-system-roles.postfix
+      postfix_conf: { relayhost: "{{postfix_smtp_relay}}" }
+
+    - role: geerlingguy.mysql
+      mysql_root_password_update: true
+      mysql_user_password_update: true
+      # Slurm requires innodb be tuned the following way,
+      # see https://slurm.schedmd.com/accounting.html#slurm-accounting-configuration-before-build
+      mysql_innodb_buffer_pool_size: "1024M"
+      mysql_innodb_log_file_size: "64M"
+      mysql_innodb_lock_wait_timeout: "900"
+      mysql_users:
+        - name: slurm
+          host: "localhost"
+          password: "{{mgmt_password}}"
+          priv: "slurm_acct_db.*:ALL"
+      mysql_databases:
+        - name: slurm_acct_db
+          collation: utf8_general_ci
+          encoding: utf8
+
+    - role: stackhpc.openhpc
+      ansible_distribution_major_version: Alma9
+      ohpc_openhpc_repos: { "Alma9": [] } # already part of BOS
+      ohpc_default_extra_repos: { "Alma9": [] } # already part of BOS
+      openhpc_enable:
+        control: true # slurmctld
+        runtime: true # slurmd
+        database: true # slurmdbd
+        batch: false # compute node
+      openhpc_slurm_configless: yes
+      openhpc_slurmdbd_mysql_password: "{{mgmt_password}}"
+      openhpc_slurm_accounting_storage_type: "accounting_storage/slurmdbd"
+      openhpc_slurm_service_enabled: true
+      openhpc_slurm_control_host: "mgmt.{{domain}}"
+      openhpc_cluster_name: "{{domain}}"
+      openhpc_packages: []
+      openhpc_slurm_partitions:
+        - name: dummy # empty partition causes slurm to stall, we'll delete this partition later to make slurm start
+
+    - role: freeipa.ansible_freeipa.ipaclient
+      state: present
+      ipaclient_domain: "{{domain}}"
+      ipaadmin_principal: admin
+      ipaadmin_password: "{{ipa_password}}"
+      ipaclient_mkhomedir: true
+      ipaclient_configure_dns_resolver: true
+      ipaclient_dns_servers: "{{idm_ip}}"
+      ipaclient_force_join: true
+
+  post_tasks:
+    ### Update slurm nodes ###
+
+    - name: "Setup HBAC: Disable allow all"
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ipa_password}}"
+        name: allow_all
+        state: disabled
+
+    - name: "Setup HBAC: Allow admin all node access"
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ipa_password}}"
+        description: Allow admin all node access
+        name: allow_admin_all_access
+        group: "admins"
+        hostcategory: all
+        servicecategory: all
+        state: present
+
+    # See https://slurm.schedmd.com/configless_slurm.html on values for the SRV record
+    - name: Add slurm configless DNS SRV records to IdM
+      freeipa.ansible_freeipa.ipadnsrecord:
+        ipaadmin_password: "{{ipa_password}}"
+        records:
+          - name: _slurmctld._tcp
+            zone_name: "{{domain}}"
+            record_type: SRV
+            srv_priority: 0
+            srv_weight: 0
+            srv_port: 6817
+            srv_target: mgmt
+
+    - name: Permit slurmctld
+      ansible.posix.firewalld:
+        port: 6817/tcp
+        state: enabled
+        permanent: true
+
+    - name: Fetch munge key
+      ansible.builtin.fetch:
+        flat: true
+        src: /etc/munge/munge.key
+        dest: "{{host_backup_directory}}/munge.key"
+
+    ### Warewulf ###
+
+    # XXX the official docs installs warewulf 3 via ohpc-warewulf which is too old
+    - name: Install warewulf 4
+      ansible.builtin.dnf:
+        name: [warewulf-ohpc]
+      retries: 5 # So AlmaLinux's mirror in the UK sometimes pick an unreliable source
+      delay: 2
+
+    - name: Setup warewulf config
+      template:
+        src: warewulf.conf.j2
+        dest: /etc/warewulf/warewulf.conf
+
+    - name: Setup warewulf default config
+      template:
+        src: defaults.conf.j2
+        dest: /etc/warewulf/defaults.conf
+
+    - name: Permit warewulf service
+      ansible.posix.firewalld:
+        service: warewulf
+        state: enabled
+        permanent: true
+
+    - name: Permit nfs service
+      ansible.posix.firewalld:
+        service: nfs
+        state: enabled
+        permanent: true
+
+    - name: Permit tftp service
+      ansible.posix.firewalld:
+        service: tftp
+        state: enabled
+        permanent: true
+
+    - name: Reload firewalld
+      ansible.builtin.systemd_service:
+        name: firewalld
+        state: reloaded
+
+    - name: Enable warewulfd
+      ansible.builtin.systemd_service:
+        name: warewulfd
+        state: started
+        enabled: true
+
+    # we're using FreeIPA for the compute nodes so don't sync passwd, causes random problems with gid mismatch
+    - name: Drop passwd overlay
+      ansible.builtin.file:
+        state: absent
+        path: /srv/warewulf/overlays/generic/etc/passwd
+
+    - name: Ensure munge key overlay path exists
+      ansible.builtin.file:
+        path: /srv/warewulf/overlays/generic/etc/munge/
+        state: directory
+
+    - name: Setup munge key overlay
+      ansible.builtin.copy:
+        src: munge.key.ww
+        dest: /srv/warewulf/overlays/generic/etc/munge/munge.key.ww
+        owner: munge
+        group: munge
+        mode: 0400
+
+    - name: Ensure add host overlay path exists
+      ansible.builtin.file:
+        path: /srv/warewulf/overlays/generic/usr/local/bin/
+        state: directory
+
+    - name: Setup add host overlay
+      ansible.builtin.template:
+        src: webhookd_notify_add_host.sh.j2
+        dest: /srv/warewulf/overlays/generic/usr/local/bin/webhookd_notify_add_host.sh
+        mode: 0500
+
+    - name: Setup del host overlay
+      ansible.builtin.template:
+        src: webhookd_notify_del_host.sh.j2
+        dest: /srv/warewulf/overlays/generic/usr/local/bin/webhookd_notify_del_host.sh
+        mode: 0500
+
+    - name: Build arch-specific overlays
+      ansible.builtin.script: "scripts/build-arch-overlays.sh {{item}}"
+      loop: "{{all_arch}}"
+
+    ### rds1 ###
+
+    - name: Install quota-rpc
+      ansible.builtin.dnf:
+        name: [quota-rpc]
+
+    - name: Create rds1 directories
+      ansible.builtin.file:
+        path: "/mnt/rds1/{{item}}"
+        state: directory
+        mode: "750"
+        group: "{{idm_default_group}}"
+      loop: "{{mgmt_exported_directories}}"
+
+    - name: Permit mountd service
+      ansible.posix.firewalld:
+        service: mountd
+        state: enabled
+        permanent: true
+
+    - name: Permit rpc-bind service
+      ansible.posix.firewalld:
+        service: rpc-bind
+        state: enabled
+        permanent: true
+
+    - name: Permit rquotad service
+      ansible.posix.firewalld:
+        service: rquotad
+        state: enabled
+        permanent: true
+
+    - name: Enable rquotad service
+      ansible.builtin.systemd_service:
+        name: rpc-rquotad
+        state: started
+        enabled: true
+
+    ### rds1 NFS ###
+
+    - name: Get Kerberos ticket
+      ansible.builtin.shell: "kinit admin <<< {{ipa_password}}"
+
+    - name: Ensure IPA service is present
+      freeipa.ansible_freeipa.ipaservice:
+        ipaadmin_password: "{{ipa_password}}"
+        name: "nfs/mgmt.{{domain}}"
+
+    - name: Get IPA keytab
+      ansible.builtin.shell: "ipa-getkeytab -s idm.{{domain}} -p nfs/mgmt.{{domain}} -k /etc/krb5.keytab"
+
+    - name: Ensure default automount locations are present
+      freeipa.ansible_freeipa.ipaautomountlocation:
+        ipaadmin_password: "{{ipa_password}}"
+        name: default
+        state: present
+
+    - name: Clear existing direct mount map
+      freeipa.ansible_freeipa.ipaautomountmap:
+        ipaadmin_password: "{{ipa_password}}"
+        name: auto.direct
+        location: default
+        state: absent
+
+    - name: Create rds1 mount map
+      freeipa.ansible_freeipa.ipaautomountmap:
+        ipaadmin_password: "{{ipa_password}}"
+        name: auto.rds1
+        location: default
+        mount: "/nfs"
+        state: present
+
+    - name: Create rds1 mount keys
+      freeipa.ansible_freeipa.ipaautomountkey:
+        ipaadmin_password: "{{ipa_password}}"
+        location: default
+        mapname: auto.rds1
+        key: "{{item}}" # points to /nfs/{{item}}
+        info: "mgmt.{{domain}}:/mnt/rds1/{{item}}"
+        state: present
+      loop: "{{mgmt_exported_directories}}"
+
+    - include_tasks: tasks/ipa_client_automount.yml
+
+    ### webhookd ###
+
+    - name: Check if webhookd is already installed
+      stat:
+        path: /usr/bin/webhookd
+      register: webhookd
+
+    - name: Install webhookd dependencies
+      ansible.builtin.dnf:
+        name: [go]
+      when: webhookd.stat.exists == False
+
+    - name: Build webhookd
+      ansible.builtin.shell:
+        cmd: |
+          go install -buildmode=pie -ldflags=-s github.com/ncarlier/webhookd@aad75eb
+          cp go/bin/webhookd /usr/bin/webhookd
+          rm -rf go
+        chdir: /root
+      when: webhookd.stat.exists == False
+
+    - name: Create webhookd environment file
+      ansible.builtin.template:
+        src: webhookd.j2
+        dest: /etc/default/webhookd
+
+    - name: Create webhookd unit file
+      ansible.builtin.template:
+        src: webhookd.service.j2
+        dest: /lib/systemd/system/webhookd.service
+        mode: 644
+
+    - name: Reload units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Enable webhookd service
+      ansible.builtin.systemd_service:
+        name: webhookd.service
+        state: started
+        enabled: true
+
+    - name: Permit webhookd service
+      ansible.posix.firewalld:
+        port: "{{mgmt_webhook_port}}/tcp"
+        state: enabled
+        permanent: true
+
+    - name: Ensure webhookd script directory exists
+      file:
+        path: /usr/share/webhookd/scripts/
+        state: directory
+
+    - name: Setup user provision webhook
+      ansible.builtin.template:
+        src: webhookd_exec_provision.sh.j2
+        dest: /usr/share/webhookd/scripts/webhookd_exec_provision.sh
+        mode: 0774
+
+    - name: Setup add host webhook
+      ansible.builtin.template:
+        src: webhookd_exec_add_host.sh.j2
+        dest: /usr/share/webhookd/scripts/webhookd_exec_add_host.sh
+        mode: 0774
+
+    - name: Setup del host webhook
+      ansible.builtin.template:
+        src: webhookd_exec_del_host.sh.j2
+        dest: /usr/share/webhookd/scripts/webhookd_exec_del_host.sh
+        mode: 0774
+
+    - name: Reload firewalld
+      ansible.builtin.systemd_service:
+        name: firewalld
+        state: reloaded
+
+    - name: Trim
+      ansible.builtin.shell: fstrim -av
+
+    - name: Reboot
+      ansible.builtin.reboot:

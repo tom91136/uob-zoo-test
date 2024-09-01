@@ -1,0 +1,40 @@
+- name: Provision IdM node
+  hosts: pve
+  become: true
+  vars: { pve_host: localhost }
+  tasks:
+    - include_tasks: tasks/setup_proxmox_api.yml
+    - include_tasks: tasks/copy_bos_image.yml
+
+    - name: Copy idm BOS image
+      ansible.builtin.copy:
+        src: /var/lib/vz/template/bos.x86_64.qcow2
+        dest: "/var/lib/vz/template/bos.x86_64.{{idm_disk_size}}.qcow2"
+        force: false
+        remote_src: true
+
+    - name: Resize idm image
+      ansible.builtin.shell: "qemu-img resize bos.x86_64.{{idm_disk_size}}.qcow2 {{idm_disk_size}}"
+      args:
+        chdir: /var/lib/vz/template/
+
+    - include_tasks: tasks/pve_create_vm.yml
+      vars:
+        vm_name: "idm.{{domain}}"
+        vm_cores: "{{idm_ncores}}"
+        vm_mem_gb: "{{idm_mem_gb}}"
+        vm_sshkeys: "{{idm_sshkeys | regex_replace('\\\\n', '\n')}}"
+        vm_user: "root"
+        vm_password: "{{idm_password}}"
+        vm_nameservers: "{{router_ip}}"
+        vm_ipconfig:
+          ipconfig0: "gw={{router_ip}},ip={{idm_ip}}/24"
+        vm_net:
+          net0: "virtio,bridge=vmbr1"
+        vm_scsi:
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{idm_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
+
+    - include_tasks: tasks/pve_vm_state.yml
+      vars: { vm_name: "idm.{{domain}}", vm_state: started }
+
+    - include_tasks: tasks/delete_image_templates.yml

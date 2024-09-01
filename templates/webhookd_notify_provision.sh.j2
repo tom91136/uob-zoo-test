@@ -1,0 +1,6 @@
+#!/bin/sh
+
+if [ "${PAM_TYPE}" = "open_session" ] && [ "${PAM_USER}" != "root" ] && [ ! -d "/nfs/home/${PAM_USER}" ]; then
+    curl -Ss -XPOST "http://mgmt.{{domain}}:{{mgmt_webhook_port}}/webhookd_exec_provision?user=$PAM_USER"
+fi
+exit 0

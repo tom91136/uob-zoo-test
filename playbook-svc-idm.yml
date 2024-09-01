@@ -1,0 +1,61 @@
+- name: Setup FreeIPA on idm node
+  hosts: "idm.{{domain}}"
+  become: true
+
+  pre_tasks:
+    - include_tasks: tasks/setup_backup_dir.yml
+    - include_tasks: tasks/backup_or_restore_host_keys.yml
+    - include_tasks: tasks/setup_unattended_security_updates.yml
+
+    # This task is based on the recommendation from https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/installing_identity_management/preparing-the-system-for-ipa-server-installation_installing-identity-management#host-name-and-dns-requirements-for-ipa_preparing-the-system-for-ipa-server-installation
+    - name: Patch /etc/hosts with fixed IP for FQDN, as required by FreeIPA
+      lineinfile:
+        path: /etc/cloud/templates/hosts.redhat.tmpl
+        regexp: '^127.0.0.1 \{\{fqdn\}\} \{\{hostname\}\}'
+        line: "{{ansible_default_ipv4.address}} {{'{{fqdn}} {{hostname}}'}} # Modified by Ansible per FreeIPA requirement"
+        backrefs: yes
+
+    - name: Patch /etc/hosts with removed IPV6 loopback IP for FQDN, as required by FreeIPA
+      lineinfile:
+        path: /etc/cloud/templates/hosts.redhat.tmpl
+        regexp: '^::1 \{\{fqdn\}\} \{\{hostname\}\}'
+        line: "# ::1 {{'{{fqdn}} {{hostname}}'}} # Modified by Ansible per FreeIPA requirement"
+        backrefs: yes
+
+    - name: Reapply cloud-init
+      ansible.builtin.shell: cloud-init init
+
+  roles:
+    - role: linux-system-roles.postfix
+      postfix_conf: { relayhost: "{{postfix_smtp_relay}}" }
+
+    - role: freeipa.ansible_freeipa.ipaserver
+      state: present
+      ipaserver_domain: "{{domain}}"
+      ipaserver_realm: "{{domain|upper}}"
+      ipaadmin_password: "{{ipa_password}}"
+      ipadm_password: "{{ipa_password}}"
+      ipaserver_setup_dns: yes
+      ipaserver_forwarders:
+        - "{{router_ip}}"
+      ipaserver_auto_forwarders: no
+      ipaserver_no_dnssec_validation: yes
+
+  post_tasks:
+    - name: Create IPA default group
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ipa_password}}"
+        name: "{{idm_default_group}}"
+
+    - name: Set IPA user defaults
+      freeipa.ansible_freeipa.ipaconfig:
+        ipaadmin_password: "{{ipa_password}}"
+        defaultgroup: "{{idm_default_group}}"
+        defaultshell: /bin/bash
+        homedirectory: /nfs/home
+
+    - name: Trim
+      ansible.builtin.shell: fstrim -av
+
+    - name: Reboot
+      ansible.builtin.reboot:

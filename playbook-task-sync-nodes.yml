@@ -1,0 +1,55 @@
+- name: Sync nodes
+  hosts: "mgmt.{{domain}}"
+  become: true
+
+  tasks:
+    - name: Remove dummy slurm partition
+      ansible.builtin.lineinfile:
+        path: /etc/slurm/slurm.conf
+        regexp: "^PartitionName=dummy"
+        firstmatch: yes
+        line: ""
+
+    - name: Remove broken SlurmctldParameters
+      ansible.builtin.lineinfile:
+        path: /etc/slurm/slurm.conf
+        regexp: "^SlurmctldParameters="
+        firstmatch: yes
+        line: ""
+
+    - name: Update slurm stateless partition and node definitions
+      ansible.builtin.blockinfile:
+        path: /etc/slurm/slurm.conf
+        append_newline: true
+        prepend_newline: true
+        marker: "### {mark} Ansible generated block: do not edit this section! ###"
+        # XXX Re-add SlurmctldParameters and ReturnToService due to malformed template, see https://github.com/stackhpc/ansible-role-openhpc/issues/170
+        block: |
+          SlurmctldParameters=enable_configless
+          ReturnToService=2 
+          MaxNodeCount=65536
+          SrunPortRange={{srun_port_range}}
+          PartitionName=compute Default=YES MaxTime=2-00 State=UP Nodes=ALL
+          {{ lookup('ansible.builtin.template', './slurm.nodes.conf.j2') }}
+
+    - name: Restart slurmctld
+      ansible.builtin.systemd_service:
+        name: slurmctld
+        state: restarted
+        enabled: true
+
+    - name: Setup warewulf node config
+      template:
+        src: nodes.conf.j2
+        dest: /etc/warewulf/nodes.conf
+
+    - name: Configure warewulf
+      ansible.builtin.shell: |
+        wwctl overlay build
+        wwctl configure --all
+
+    - name: Restart warewulfd
+      ansible.builtin.systemd_service:
+        name: warewulfd
+        state: restarted
+        enabled: true

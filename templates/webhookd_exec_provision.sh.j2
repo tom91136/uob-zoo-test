@@ -1,0 +1,17 @@
+#!/bin/sh
+# Modified from https://access.redhat.com/solutions/6732801
+set -eu
+# shellcheck disable=SC2154
+PAM_USER="$user"
+HOME_DIR="/mnt/rds1/home/$PAM_USER"
+if [ -d "$HOME_DIR" ]; then
+    logger "$0: Request received for user $PAM_USER with existing homedir: $HOME_DIR; skipping..."
+elif ipa user-find --login="$user" --in-groups="{{idm_default_group}}" >/dev/null 2>&1; then
+    logger "$0: Creating homedir $HOME_DIR for $PAM_USER ($(id -u "$PAM_USER"))"
+    mkdir -p "$HOME_DIR"
+    find /etc/skel -mindepth 1 -exec cp {} "$HOME_DIR/" \;
+    chown -R "$PAM_USER":"$PAM_USER" "$HOME_DIR"
+else
+    logger "$0: Unknown user $PAM_USER, request ignored"
+fi
+exit 0

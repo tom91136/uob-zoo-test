@@ -1,0 +1,23 @@
+- name: Get home dir path
+  ansible.builtin.shell: pwd
+  register: dir
+
+- ansible.builtin.fail:
+    msg: "Bad home dir path"
+  when:
+    - dir.rc != 0 or dir.stdout.strip() != "/nfs/home/" + ansible_user
+
+- name: Get srun node hostnames
+  ansible.builtin.shell: srun --nodelist={{node}} hostname
+  register: srun
+  until: srun.rc == 0
+  retries: 30 # 3 minutes
+  delay: 1
+  loop: "{{nodes.keys()}}"
+  loop_control: { loop_var: node }
+
+- ansible.builtin.fail:
+    msg: "Bad srun outcome"
+  when: result.rc != 0 or result.stdout.strip() != result.node
+  loop: "{{srun.results}}"
+  loop_control: { loop_var: result }

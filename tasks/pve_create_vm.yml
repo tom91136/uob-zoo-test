@@ -1,0 +1,30 @@
+- name: "Create PVE VM: {{vm_name}}"
+  community.general.proxmox_kvm:
+    api_user: "{{pve_username}}"
+    api_password: "{{pve_password}}"
+    api_host: "{{pve_host}}"
+    node: "{{pve_node}}"
+    agent: true
+    autostart: true
+    onboot: true
+    cpu: "host"
+    name: "{{vm_name}}"
+    sockets: 1
+    cores: "{{vm_cores}}"
+    memory: "{{1024 * vm_mem_gb}}"
+    net: "{{vm_net}}"
+    scsihw: "virtio-scsi-pci"
+    sata:
+      sata0: "{{storage_pool}}:cloudinit,media=cdrom"
+    sshkeys: "{{vm_sshkeys}}"
+    ciuser: "{{vm_user}}"
+    cipassword: "{{vm_password}}"
+    ipconfig: "{{vm_ipconfig}}"
+    scsi: "{{vm_scsi}}"
+    nameservers: "{{vm_nameservers}}"
+    bios: ovmf
+    efidisk0:
+      storage: "{{storage_pool}}"
+      format: raw
+      efitype: 4m
+      pre_enrolled_keys: 0

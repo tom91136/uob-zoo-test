@@ -1,0 +1,38 @@
+- name: Sync images
+  hosts: "mgmt.{{domain}}"
+  become: true
+
+  tasks:
+    - name: Copy COS image
+      ansible.builtin.copy:
+        src: "images/cos.{{item}}.warewulf.tar"
+        dest: "/root/cos.{{item}}.warewulf.tar"
+      loop: "{{all_arch}}"
+
+    - name: Import COS image
+      ansible.builtin.shell: | # XXX the first import sometime fails (!)
+        wwctl container import "/root/cos.{{item}}.warewulf.tar" "cos_{{item}}" --force --syncuser || \
+        wwctl container import "/root/cos.{{item}}.warewulf.tar" "cos_{{item}}" --force --syncuser
+      loop: "{{all_arch}}"
+      async: 120
+      poll: 0
+      register: _cos_import
+
+    - name: Wait for COS image import
+      async_status: { jid: "{{item.ansible_job_id}}" }
+      register: _jobs_cos_import
+      retries: 120
+      delay: 1
+      until: _jobs_cos_import.finished
+      loop: "{{_cos_import.results}}"
+
+    - name: Configure warewulf
+      ansible.builtin.shell: |
+        wwctl overlay build
+        wwctl configure --all
+
+    - name: Restart warewulfd
+      ansible.builtin.systemd_service:
+        name: warewulfd
+        state: restarted
+        enabled: true

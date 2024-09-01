@@ -1,0 +1,11 @@
+- name: Define localhost backup directory
+  set_fact:
+    backup_directory: "backup"
+    host_backup_directory: "backup/{{inventory_hostname}}"
+
+- name: Create localhost backup directory
+  ansible.builtin.file:
+    path: "{{host_backup_directory}}"
+    state: directory
+  become: false
+  delegate_to: localhost

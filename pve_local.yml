@@ -1,0 +1,179 @@
+---
+ungrouped:
+  hosts:
+    pve:
+      ansible_ssh_host: 192.168.1.212
+      ansible_ssh_port: 22
+      ansible_ssh_user: "root"
+      ansible_ssh_private_key_file: "/home/tom/.ssh/id_ed25519"
+    idm.zoo.local:
+      ansible_host: 10.70.50.101
+      ansible_port: 22
+      ansible_user: root
+      ansible_ssh_extra_args: -o ProxyCommand="ssh -W %h:%p root@192.168.1.212"
+      ansible_ssh_private_key_file: "/home/tom/.ssh/id_ed25519"
+    mgmt.zoo.local:
+      ansible_host: 10.70.50.102
+      ansible_port: 22
+      ansible_user: root
+      ansible_ssh_extra_args: -o ProxyCommand="ssh -W %h:%p root@192.168.1.212"
+      ansible_ssh_private_key_file: "/home/tom/.ssh/id_ed25519"
+    login-amd64.zoo.local:
+      ansible_host: 10.70.50.103
+      ansible_port: 22
+      ansible_user: root
+      ansible_ssh_extra_args: -o ProxyCommand="ssh -W %h:%p root@192.168.1.212"
+      ansible_ssh_private_key_file: "/home/tom/.ssh/id_ed25519"
+    login-arm64.zoo.local:
+      ansible_host: 10.70.50.104
+      ansible_port: 22
+      ansible_user: root
+      ansible_ssh_extra_args: -o ProxyCommand="ssh -W %h:%p root@192.168.1.212"
+      ansible_ssh_private_key_file: "/home/tom/.ssh/id_ed25519"
+  vars:
+    domain: zoo.local
+    admin_email: "wl14928@bristol.ac.uk"
+    postfix_smtp_relay: "bristol-ac-uk.mail.protection.outlook.com" # nslookup -type=mx bristol.ac.uk 8.8.8.8
+    unattended_security_update_interval: "Mon *-*-1..7 00:00:00"
+    srun_port_range: "60001-65000"
+    ssh_private_key: "/home/tom/.ssh/id_ed25519"
+    arch_to_dns_map:
+      x86_64: amd64
+      aarch64: arm64
+    storage_pool: "local-lvm"
+    pve_username: root@pam
+    pve_password: vagrant
+    pve_node: pve
+    pve_ip: 10.70.50.2
+    router_host: router
+    router_password: lionstigersandbears
+    router_disk_size: 6G
+    router_mem_gb: 2
+    router_ncores: 6
+    router_ip: 10.70.50.10
+    router_mgmt_ip: 10.70.49.1
+    router_mgmt_dhcp_start: 10.10.20.2
+    router_mgmt_dhcp_end: 10.10.20.254
+    router_dns1: 1.1.1.1
+    router_dns2: 8.8.8.8
+    idm_host: idm
+    idm_password: lionstigersandbears
+    idm_disk_size: 10G
+    idm_mem_gb: 4
+    idm_ncores: 6
+    idm_sshkeys:
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICUi+THujYlEQ1SGhrkmjJfN/yChwvSmZXTPiyZCw6O6\nssh-ed25519
+      AAAAC3NzaC1lZDI1NTE5AAAAIHu/W7nsizI/u+LmFhINADQuLPOn34mkbXzvkPqxMarU
+    idm_ip: 10.70.50.101
+    ipa_password: lionstigersandbears
+    idm_default_group: cluster-user
+    mgmt_host: mgmt
+    mgmt_password: lionstigersandbears
+    mgmt_disk_size: 20G
+    mgmt_mem_gb: 2
+    mgmt_ncores: 6
+    mgmt_sshkeys:
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICUi+THujYlEQ1SGhrkmjJfN/yChwvSmZXTPiyZCw6O6\nssh-ed25519
+      AAAAC3NzaC1lZDI1NTE5AAAAIHu/W7nsizI/u+LmFhINADQuLPOn34mkbXzvkPqxMarU
+    mgmt_rds_disk_id: ata-SanDisk_SDSSDP128G_140257402929
+    mgmt_ip: 10.70.50.102
+    mgmt_netmask: 255.255.255.0
+    mgmt_network: 10.70.50.0
+    mgmt_compute_dhcp_start: 10.70.50.210
+    mgmt_compute_dhcp_end: 10.70.50.250
+    mgmt_webhook_port: "8081"
+    mgmt_exported_directories:
+      - home
+      - shared
+    mgmt_cluster_name: staging
+    login_password: lionstigersandbears
+    login_disk_size: 10G
+    login_mem_gb: 2
+    login_ncores: 6
+    login_sshkeys:
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICUi+THujYlEQ1SGhrkmjJfN/yChwvSmZXTPiyZCw6O6\nssh-ed25519
+      AAAAC3NzaC1lZDI1NTE5AAAAIHu/W7nsizI/u+LmFhINADQuLPOn34mkbXzvkPqxMarU
+    login_ip_from_arch_map:
+      x86_64: "10.70.50.103"
+      aarch64: "10.70.50.104"
+    login_message_of_the_day: |
+      ╭─┬─┬─┬─╮
+      ├─┼─┼─┼─┤  UoB HPC Zoo Research Cluster
+      ├─┼─┼─┼─┤  Documentation: https://uob-hpc.github.io/zoo/
+      ├─┼─┼─┼─┤  Contact: Tom Deakin <tom.deakin@bristol.ac.uk>.
+      ╰─┴─┴─┴─╯
+
+      Unauthorised access may constitute a criminal offence and all activity on the 
+      system is liable to monitoring.
+      We provide *no* guarantees of service, availability, and privacy of the Zoo and 
+      it is used at your own risk; non-research activities such as crypto mining will 
+      lead to immediate termination of your account.
+
+      Frequently used commands:
+      arch # return architecture of the current host
+      quota # get disk quota
+      sinfo # list available nodes and partitions
+      squeue --me # list your active and pending jobs
+    all_arch:
+      - x86_64
+      - aarch64
+    nodes:
+      compute0.zoo.local:
+        ip: 10.70.50.220
+        mac: BC:24:11:79:07:78
+        pve: host
+        image: cos_x86_64
+        overlays:
+          - wwinit
+          - generic
+          - arch-x86_64
+        sockets: 1
+        threads_per_core: 1
+        cores_per_socket: 4
+        pve_disk_size: 1G
+        pve_mem_gb: 6
+        pve_ncores: 4
+      compute1.zoo.local:
+        ip: 10.70.50.221
+        mac: BC:24:11:79:07:79
+        pve: aarch64
+        image: cos_aarch64
+        overlays:
+          - wwinit
+          - generic
+          - arch-aarch64
+        sockets: 1
+        threads_per_core: 1
+        cores_per_socket: 4
+        pve_disk_size: 1G
+        pve_mem_gb: 6
+        pve_ncores: 4
+      compute-ext0.zoo.local:
+        ip: 10.70.50.222
+        mac: 48:2A:E3:75:F0:1A
+        image: cos_x86_64
+        overlays:
+          - wwinit
+          - generic
+          - arch-x86_64
+        sockets: 1
+        threads_per_core: 1
+        cores_per_socket: 6
+      compute-ext1.zoo.local:
+        ip: 10.70.50.223
+        mac: DC:A6:32:08:62:FA
+        image: cos_aarch64
+        overlays:
+          - wwinit
+          - generic
+          - arch-aarch64
+        sockets: 1
+        threads_per_core: 1
+        cores_per_socket: 4
+    users:
+      tom:
+        first: Tom
+        last: Lin
+        email: wl14928@bristol.ac.uk
+        publickey:
+          - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHu/W7nsizI/u+LmFhINADQuLPOn34mkbXzvkPqxMarU

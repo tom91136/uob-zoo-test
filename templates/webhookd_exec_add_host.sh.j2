@@ -1,0 +1,29 @@
+#!/bin/sh
+# Modified from https://access.redhat.com/solutions/6732801
+set -eu
+
+# shellcheck disable=SC2154
+OTP="$otp"
+# shellcheck disable=SC2154
+HOST="$host"
+# shellcheck disable=SC2154
+REGISTER_DNS="$register_dns"
+
+logger "$0: Registering host $HOST.{{domain}}"
+
+if [ "$REGISTER_DNS" = "true" ]; then
+    logger "$0: Registering DNS for $HOST.{{domain}} as requested"
+    if ! ipa dnsrecord-find "{{domain}}" "$HOST" 2>&1 | logger; then
+        # shellcheck disable=SC2154
+        CLIENT_IP="$x_forwarded_for"
+        logger "$0: DNS record not found, adding $CLIENT_IP to A record"
+        ipa dnsrecord-add "{{domain}}" "$HOST" --a-rec "$CLIENT_IP" 2>&1 | logger
+    fi
+fi
+
+ipa host-del "$HOST.{{domain}}" 2>&1 || true | logger
+ipa host-add "$HOST.{{domain}}" --password="$OTP" --force 2>&1 | logger
+
+logger "$0: Host $HOST.{{domain}} registered"
+
+exit 0

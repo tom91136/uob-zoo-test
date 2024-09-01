@@ -1,0 +1,13 @@
+#!/bin/sh
+# Modified from https://access.redhat.com/solutions/6732801
+set -eu
+
+# shellcheck disable=SC2154
+HOST="$host"
+
+logger "$0: Deleting host $HOST.{{domain}}"
+ipa host-del "$HOST.{{domain}}" 2>&1 || true | logger
+logger "$0: Deleting A record for $HOST"
+ipa dnsrecord-del "{{domain}}" "$HOST" --del-all 2>&1 || true | logger
+
+exit 0

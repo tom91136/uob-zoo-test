@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -eu
+
+otp="$(tr -dc A-Za-z0-9 </dev/urandom | head -c 13)"
+host="$(hostname --short)"
+
+register_dns=false
+if [ "${1:-}" = "--register-dns" ]; then register_dns=true; fi
+
+curl -Ss -XPOST "http://mgmt.{{domain}}:{{mgmt_webhook_port}}/webhookd_exec_add_host?otp=$otp&host=$host&register_dns=$register_dns"
+
+if ipa-client-install \
+    --unattended --force-join --no-ntp --no-dns-sshfp --no-nisdomain --no-ssh --no-sshd --ssh-trust-dns \
+    --hostname="$host.{{domain}}" \
+    --password="$otp" 2>&1 | grep -q "already configured"; then
+    exit 0
+fi
+
+ipa-client-automount --unattended
+
+exit 0

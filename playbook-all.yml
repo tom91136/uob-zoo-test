@@ -1,0 +1,15 @@
+- import_playbook: playbook-vm-router.yml
+- import_playbook: playbook-vm-idm.yml
+- import_playbook: playbook-vm-mgmt.yml
+- import_playbook: playbook-vm-login.yml
+
+- import_playbook: playbook-svc-idm.yml
+- import_playbook: playbook-svc-mgmt.yml
+
+- import_playbook: playbook-task-sync-images.yml
+- import_playbook: playbook-task-sync-nodes.yml
+- import_playbook: playbook-task-sync-users.yml
+- import_playbook: playbook-vm-compute.yml
+
+- import_playbook: playbook-svc-login.yml
+- import_playbook: playbook-task-tests.yml

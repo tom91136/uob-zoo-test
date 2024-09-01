@@ -1,0 +1,53 @@
+# Images
+
+Requirements:
+
+* [Podman](https://podman.io/docs/installation) (CLI only)
+* `bunzip2`, `wget`, `sha256sum`
+
+A Makefile is available to generate OS images.
+The build process uses specialised tools, [virt-customize](https://www.libguestfs.org/virt-customize.1.html) and [packer](https://www.packer.io/), to automate the entire process.
+As the tools may not be available on all platforms and architectures, a Dockerfile is present to install these tools, and as such, the only requirement is Podman.
+
+Two images are required: the Base OS and the OPNSense router image.
+
+## Base OS (BOS)
+
+For common management and login node, we use AlmaLinux, a RHEL rebuild like RockyLinux.
+We use a special cloud-init image that picks up user credentials and SSH keys via a CD-ROM that's loaded by the hypervisor.
+For customisation, virt-customize handles installation of extra packages and initial software update.
+
+Available variables:
+
+Available targets:
+
+* bos.x86_64.qcow2
+* bos.aarch64.qcow2
+
+For example, to build an x86 OS image:
+
+```shell
+make bos.x86_64.qcow2
+```
+
+Note that non-native platforms can still be built via bin-fmt emulation, but at considerable performance penality (up-tp 256x slowdown).
+
+## OPNSense
+
+For the router and firewall, we use OPNSense, a BSD-based distribution that specialises in networking.
+As this is a BSD image, we cannot automate the image creation easily, so we use packer to boot the image in a VM and enter keystrokes to complete a fully automated install.
+Once the installation completes, packer will extract the VM disk into a image that we can later import into our hypervisor.
+An OPNSense configuration file `opnsense-config.xml` is used to provision the correct interfaces and rules, please update this file with the latest by exporting 
+
+Available targets:
+
+* opnsense.qcow2
+
+For example, to build the image:
+
+```shell
+make opnsense.qcow2
+```
+
+> [!IMPORTANT]  
+> It takes about 5~7 minutes for packer to step: `Typing the boot commands over VNC...`

@@ -1,0 +1,61 @@
+- name: Provision router node
+  hosts: pve
+  become: true
+  vars: { pve_host: localhost }
+  tasks:
+    - include_tasks: tasks/setup_proxmox_api.yml
+
+    - name: Copy router image
+      ansible.builtin.copy:
+        src: images/opnsense.qcow2
+        dest: "/var/lib/vz/template/opnsense.amd64.{{router_disk_size}}.qcow2"
+        force: false
+
+    - name: Resize router image
+      ansible.builtin.shell: "qemu-img resize opnsense.amd64.{{router_disk_size}}.qcow2 {{router_disk_size}}"
+      args:
+        chdir: /var/lib/vz/template/
+
+    - name: Create router node
+      community.general.proxmox_kvm:
+        api_user: "{{pve_username}}"
+        api_password: "{{pve_password}}"
+        api_host: "{{pve_host}}"
+        node: "{{pve_node}}"
+        agent: true
+        autostart: true
+        onboot: true
+        cpu: "host"
+        name: "router.{{domain}}"
+        sockets: 1
+        cores: "{{router_ncores}}"
+        memory: "{{1024 * router_mem_gb}}"
+        net:
+          net0: "virtio,bridge=vmbr0"
+          net1: "virtio,bridge=vmbr1"
+          net2: "virtio,bridge=vmbr2"
+        scsihw: "virtio-scsi-single"
+        scsi:
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/opnsense.amd64.{{router_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
+
+    - include_tasks: tasks/pve_vm_state.yml
+      vars: { vm_name: "router.{{domain}}", vm_state: started }
+
+    - include_tasks: tasks/delete_image_templates.yml
+
+    - name: Get router VMID
+      ansible.builtin.shell: qm list | awk '/router.{{domain}}/ {print $1}'
+      register: router_vmid_output
+
+    - set_fact: router_vmid={{router_vmid_output.stdout}}
+
+    - name: Configure OPNsense config.xml
+      template:
+        src: config.xml.j2
+        dest: /var/lib/vz/opnsense-config.xml
+
+    - name: Upload config.xml to router
+      ansible.builtin.script: "scripts/pve-agent-send.sh /var/lib/vz/opnsense-config.xml /conf/config.xml {{router_vmid}}"
+
+    - include_tasks: tasks/pve_vm_state.yml
+      vars: { vm_name: "router.{{domain}}", vm_state: restarted }

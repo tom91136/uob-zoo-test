@@ -1,0 +1,31 @@
+WW_INTERNAL: 43
+ipaddr: {{mgmt_ip}}
+netmask: {{mgmt_netmask}}
+network: {{mgmt_network}}
+warewulf:
+  port: 9873
+  secure: false
+  update interval: 60
+  autobuild overlays: true
+  host overlay: true
+  syslog: false
+dhcp:
+  enabled: true
+  range start: {{mgmt_compute_dhcp_start}}
+  range end: {{mgmt_compute_dhcp_end}}
+  systemd name: dhcpd
+tftp:
+  enabled: true
+  systemd name: tftp
+nfs:
+  enabled: true
+  export paths:
+  - path: /mnt/rds1
+    export options: rw # ,sec=krb5i
+    mount options: defaults
+    mount: false # let autofs handle this
+  systemd name: nfs-server
+container mounts:
+  - source: /etc/resolv.conf
+    dest: /etc/resolv.conf
+    readonly: true

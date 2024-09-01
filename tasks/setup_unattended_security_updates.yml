@@ -1,0 +1,32 @@
+- name: Install automatic dnf
+  ansible.builtin.dnf:
+    name: ["dnf-automatic"]
+
+- name: Configure automatic dnf security updates
+  ansible.builtin.blockinfile:
+    path: /etc/dnf/automatic.conf
+    append_newline: true
+    prepend_newline: true
+    marker: "### {mark} Ansible generated block: do not edit this section! ###"
+    block: |
+      [commands]
+      apply_updates = yes
+      upgrade_type = security
+      [emitters]
+      emit_via = email,stdio
+      [email]
+      email_host = {{postfix_smtp_relay}}
+      email_from = root@{{domain}}
+      email_to = {{admin_email}}
+
+- name: Configure automatic dnf interval
+  ansible.builtin.lineinfile:
+    path: /usr/lib/systemd/system/dnf-automatic-install.timer
+    regexp: "^OnCalendar="
+    line: "OnCalendar={{unattended_security_update_interval}}"
+
+- name: Enable automatic DNF service
+  ansible.builtin.systemd_service:
+    name: dnf-automatic.timer
+    state: started
+    enabled: true

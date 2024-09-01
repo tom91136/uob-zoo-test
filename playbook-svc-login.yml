@@ -1,0 +1,110 @@
+- name: Setup FreeIPA client on login node
+  hosts: "login-*.{{domain}}"
+  become: true
+
+  pre_tasks:
+    - include_tasks: tasks/setup_backup_dir.yml
+    - include_tasks: tasks/backup_or_restore_host_keys.yml
+    - include_tasks: tasks/setup_unattended_security_updates.yml
+
+    - name: Setup motd
+      ansible.builtin.copy:
+        content: "{{login_message_of_the_day}}"
+        dest: /etc/motd.d/00-welcome.motd
+
+    - name: Permit mountd service
+      ansible.posix.firewalld:
+        service: mountd
+        state: enabled
+        permanent: true
+
+    - name: Permit rpc-bind service
+      ansible.posix.firewalld:
+        service: rpc-bind
+        state: enabled
+        permanent: true
+
+    - name: Permit slurm srun ranges
+      ansible.posix.firewalld:
+        port: "{{srun_port_range}}/tcp"
+        state: enabled
+        permanent: true
+
+  roles:
+    - role: linux-system-roles.postfix
+      postfix_conf: { relayhost: "{{postfix_smtp_relay}}" }
+
+    - role: stackhpc.openhpc
+      ansible_distribution_major_version: Alma9
+      ohpc_openhpc_repos: { "Alma9": [] } # already part of BOS
+      ohpc_default_extra_repos: { "Alma9": [] } # already part of BOS
+      openhpc_enable:
+        control: false # slurmctld
+        runtime: true # slurmd
+        database: false # slurmdbd
+        batch: false # compute node
+      openhpc_slurm_configless: true
+      openhpc_slurm_service_enabled: true
+      openhpc_login_only_nodes: "{{inventory_hostname}}"
+      openhpc_cluster_name: "{{mgmt_cluster_name}}"
+
+    - role: freeipa.ansible_freeipa.ipaclient
+      state: present
+      ipaclient_domain: "{{domain}}"
+      ipaadmin_password: "{{ipa_password}}"
+      ipaclient_configure_dns_resolver: yes
+      ipaclient_dns_servers: "{{idm_ip}}"
+      ipaclient_force_join: yes
+
+  post_tasks:
+    - name: "Setup HBAC: Allow users login node access"
+      freeipa.ansible_freeipa.ipahbacrule:
+        ipaadmin_password: "{{ipa_password}}"
+        description: Allow users login node access
+        name: allow_normal_user_login_access
+        group: "{{idm_default_group}}"
+        host: "{{ansible_play_hosts}}"
+        servicecategory: all
+        state: present
+      run_once: true # this is a single rule to cover all login nodes, so run this once
+
+    ### Restore slurm credentials ###
+
+    - name: Upload munge key
+      ansible.builtin.copy:
+        src: "{{backup_directory}}/mgmt.{{domain}}/munge.key"
+        dest: /etc/munge/munge.key
+
+    - name: Reload munge service
+      ansible.builtin.systemd_service:
+        name: munge
+        state: restarted
+
+    ### Configure autofs ###
+
+    - name: Make autofs browsable by default
+      ansible.builtin.lineinfile:
+        path: /etc/autofs.conf
+        regexp: "^browse_mode = "
+        line: browse_mode = yes
+
+    ### Configure webhookd provision notifications ###
+
+    - name: Setup pam_exec user provision script
+      ansible.builtin.template:
+        src: webhookd_notify_provision.sh.j2
+        dest: /usr/local/bin/webhookd_notify_provision.sh
+        mode: 700
+
+    - name: Setup pam_exec home directory script
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/sshd
+        line: session optional pam_exec.so quiet /usr/local/bin/webhookd_notify_provision.sh
+
+    - include_tasks: tasks/ipa_client_automount.yml
+
+    - name: Trim
+      ansible.builtin.shell: fstrim -av
+
+    - name: Reboot
+      ansible.builtin.reboot:

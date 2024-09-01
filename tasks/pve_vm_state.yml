@@ -1,0 +1,10 @@
+- name: "Set PVE VM state: {{vm_name}} => {{vm_state}}"
+  community.general.proxmox_kvm:
+    api_user: "{{pve_username}}"
+    api_password: "{{pve_password}}"
+    api_host: "{{pve_host}}"
+    node: "{{pve_node}}"
+    name: "{{vm_name}}"
+    state: "{{vm_state}}"
+  retries: 20
+  delay: 1

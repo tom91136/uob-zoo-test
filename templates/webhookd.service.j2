@@ -1,0 +1,20 @@
+[Unit]
+Description=webhookd
+Documentation=https://github.com/ncarlier/webhookd
+Wants=network-online.target
+After=network-online.target
+AssertFileIsExecutable=/usr/bin/webhookd
+
+[Service]
+WorkingDirectory=/usr/share/webhookd
+EnvironmentFile=/etc/default/webhookd
+ExecStart=/usr/bin/webhookd
+
+# Let systemd restart this service always
+Restart=always
+
+# Specifies the maximum file descriptor number that can be opened by this process
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

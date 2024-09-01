@@ -1,0 +1,13 @@
+roles:
+  - name: geerlingguy.mysql
+    version: "4.3.4"
+
+  - name: stackhpc.openhpc
+    version: "v0.26.0"
+
+  - name: linux-system-roles.postfix
+    version: "1.5.1"
+
+collections:
+  - name: freeipa.ansible_freeipa
+    version: "1.13.2"

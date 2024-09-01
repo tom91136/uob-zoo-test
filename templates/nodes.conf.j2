@@ -1,0 +1,23 @@
+WW_INTERNAL: 43
+nodeprofiles:
+  default:
+    comment: This profile is automatically included for each node
+    network devices:
+      default:
+        device: eth0
+        netmask: {{mgmt_netmask}}
+        gateway: {{router_ip}}
+nodes:
+{% for node, vars in nodes.items() %}
+  {{node}}:
+    discoverable: "true"
+    profiles:
+    - default
+    container name: {{vars.image}}
+    system overlay: {{vars.overlays}}
+    network devices:
+      default:
+        hwaddr: {{vars.mac}}
+        ipaddr: {{vars.ip}}
+        primary: "true"
+{% endfor %}

@@ -1,0 +1,80 @@
+# See https://github.com/warewulf/warewulf-node-images/blob/main/rockylinux-9/Containerfile-fixed
+ARG COS_RELEASE
+FROM docker.io/library/almalinux:${COS_RELEASE} AS cos.base.${COS_RELEASE}
+ARG PACKAGES
+
+ENV PACKAGES=${PACKAGES}
+
+COPY ./cos-provision.sh /
+RUN chmod +x /cos-provision.sh && /cos-provision.sh && rm -rf /cos-provision.sh
+
+# Patch up munge key permissions after overlay and before munge starts
+COPY <<EOF /etc/systemd/system/patch-munge-key.service
+[Unit]
+Description=Correct munge permission
+After=network-online.target
+After=wwclient.target
+Before=munge.service
+
+[Service]
+ExecStart=/bin/sh -c "chmod 400 /etc/munge/munge.key && chown munge:munge /etc/munge/munge.key"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Domain join just before slurm starts so that all jobs will have storage and user
+COPY <<EOF /etc/systemd/system/ipa-add-host.service
+[Unit]
+Description=Add host to IPA
+After=network-online.target
+After=wwclient.target
+Before=slurmd.service
+
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/webhookd_notify_add_host.sh
+Restart=on-failure
+RestartSec=1
+StartLimitIntervalSec=10
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Setup services
+RUN systemctl enable ipa-add-host patch-munge-key munge slurmd && \
+    sed -i '/After=network.target/a After=wwclient.target' /usr/lib/systemd/system/munge.service
+
+RUN mkdir -p /etc/warewulf/
+
+# Warewulf default excludes
+COPY <<EOF /etc/warewulf/excludes
+/boot/
+/usr/share/GeoIP
+EOF
+
+# Warewulf exit scripts
+COPY <<EOF /etc/warewulf/container_exit.sh
+#!/bin/sh
+export LANG=C LC_CTYPE=C
+set -x
+dnf clean all
+EOF
+
+# Extract vmlinuz for aarch64 if compressed
+RUN arch=$(uname -m) && \
+    if [ "$arch" = "aarch64" ]; then \
+        cd /usr/lib/modules/*.aarch64 && \
+        if file vmlinuz | grep -q 'gzip compressed data'; then \
+            echo "vmlinuz is gzip compressed, decompressing..." && \
+            mv vmlinuz vmlinux.gz && \
+            gunzip vmlinux.gz; \
+        fi; \
+    fi
+
+# RUN dnf clean all
+
+CMD ["/bin/echo", "-e", "For Warewulf provisioning only, do not run"]

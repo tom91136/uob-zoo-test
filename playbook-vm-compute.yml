@@ -1,0 +1,43 @@
+- name: Provision compute nodes
+  hosts: pve
+  become: true
+  vars: { pve_host: localhost }
+  tasks:
+    - name: Create virtualised compute nodes
+      community.general.proxmox_kvm:
+        api_user: "{{pve_username}}"
+        api_password: "{{pve_password}}"
+        api_host: "{{pve_host}}"
+        node: "{{pve_node}}"
+        agent: true
+        autostart: true
+        onboot: true
+        cpu: "host"
+        name: "{{item.key}}"
+        sockets: 1
+        cores: "{{item.value.pve_ncores}}"
+        memory: "{{1024 * item.value.pve_mem_gb}}"
+        net:
+          net0: "virtio={{item.value.mac}},bridge=vmbr1"
+        scsihw: "virtio-scsi-pci"
+        scsi:
+          scsi0: "{{storage_pool}}:1,size={{item.value.pve_disk_size}}"
+        bios: ovmf
+        efidisk0:
+          storage: "{{storage_pool}}"
+          format: raw
+          efitype: 4m
+          pre_enrolled_keys: 0
+      when: item.value.pve is defined
+      loop: "{{nodes | dict2items}}"
+
+    - name: Patch up aarch64 compute nodes
+      ansible.builtin.script:
+        cmd: "scripts/patch-pve-aarch64.sh {{item.key}}"
+      when: item.value.pve is defined and item.value.pve == 'aarch64'
+      loop: "{{nodes | dict2items}}"
+
+    - include_tasks: tasks/pve_vm_state.yml
+      vars: { vm_name: "{{item.key}}", vm_state: started }
+      when: item.value.pve is defined
+      loop: "{{nodes | dict2items}}"
