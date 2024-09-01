@@ -126,7 +126,7 @@ source "qemu" "proxmox-ve-amd64" {
   qemuargs = [
     ["-cpu", "host"],
   ]
-  headless            = false
+  headless            = true
   use_default_display = false
   net_device          = "virtio-net"
   http_directory      = "."
