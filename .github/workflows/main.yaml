@@ -84,7 +84,7 @@ jobs:
 
       - name: Install tools
         run: |
-          sudo apt-get install -y tmux micro
+          sudo apt-get install -y tmux micro dstat nload
           cd
           git clone https://github.com/gpakosz/.tmux.git
           ln -s -f .tmux/.tmux.conf
@@ -106,7 +106,7 @@ jobs:
       ################
 
       - name: Install dependencies
-        run: sudo apt-get install -y cloud-utils libvirt-dev
+        run: sudo apt-get install -y cloud-utils libvirt-dev python3-passlib
 
       - name: Install packer and vagrant
         run: |
@@ -123,19 +123,34 @@ jobs:
       - name: Stats
         run: df -H
 
-      - name: Build opnsense image
-        working-directory: images
-        run: make opnsense.qcow2
+      - name: Create proxmox/router image
+        run: |
+          (
+            cd images
+            time make opnsense.qcow2
+          ) &
+          (
+            cd proxmox
+            time make build-libvirt 
+            vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
+            make clean
+          ) & wait
         if: always()
+
+      # - name: Build opnsense image
+      #   working-directory: images
+      #   run: | 
+      #     make opnsense.qcow2
+      #   if: always()
 
       - name: Build bos image
         working-directory: images
-        run: make bos.x86_64.qcow2 bos.aarch64.qcow2 -j
+        run: time make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
         if: always()
 
       - name: Build cos image
         working-directory: images
-        run: make  cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar -j
+        run: time make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
         if: always()
 
       - name: Clean up image
@@ -143,29 +158,24 @@ jobs:
         run: |
           # make all -j
           # make cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar bos.x86_64.qcow2 bos.aarch64.qcow2 opnsense.qcow2
-          rm -rf *.iso
+          time rm -rf *.iso
         if: always()
 
       - name: Stats
         run: df -H
         if: always()
 
-      - name: Create proxmox image
-        working-directory: proxmox
-        run: |
-          make build-libvirt
-          vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
-          make clean
-        if: always()
+
 
       - name: Stats
         run: df -H
 
-      - name: Run provision
-        run: vagrant up
+      # - name: Run provision
+      #   run: vagrant up
 
       - name: Stats
         run: df -H
 
       - name: Wait for SSH
         run: sleep infinity
+        if: always()
