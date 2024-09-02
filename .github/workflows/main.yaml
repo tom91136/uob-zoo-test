@@ -123,21 +123,40 @@ jobs:
       - name: Stats
         run: df -H
 
+      - name: Build opnsense image
+        working-directory: images
+        run: make opnsense.qcow2
+        if: always()
+
+      - name: Build bos image
+        working-directory: images
+        run: make bos.x86_64.qcow2 bos.aarch64.qcow2 -j
+        if: always()
+
+      - name: Build cos image
+        working-directory: images
+        run: make  cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar -j
+        if: always()
+
+      - name: Clean up image
+        working-directory: images
+        run: |
+          # make all -j
+          # make cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar bos.x86_64.qcow2 bos.aarch64.qcow2 opnsense.qcow2
+          rm -rf *.iso
+        if: always()
+
+      - name: Stats
+        run: df -H
+        if: always()
+
       - name: Create proxmox image
         working-directory: proxmox
         run: |
           make build-libvirt
           vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
           make clean
-
-      - name: Stats
-        run: df -H
-
-      - name: Create all image
-        working-directory: images
-        run: |
-          make all -j
-          rm -rf *.iso
+        if: always()
 
       - name: Stats
         run: df -H
