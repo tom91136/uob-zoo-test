@@ -67,7 +67,7 @@ jobs:
           sudo modprobe zram
 
           totalmem=`LC_ALL=C free | grep -e "^Mem:" | sed -e 's/^Mem: *//' -e 's/  *.*//'`
-          mem=$((totalmem * 4 * 1024))
+          mem=$((totalmem * 4 * 1024)) 
 
           sudo sh -c "echo $mem > /sys/block/zram0/disksize"
           sudo mkswap /dev/zram0
