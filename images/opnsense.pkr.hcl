@@ -31,7 +31,7 @@ source "qemu" "opnsense" {
   iso_urls     = [var.opnsense_image]
 
   vm_name          = "opnsense.qcow2"
-  headless         = false
+  headless         = true
   accelerator      = "kvm"
   cpus             = 2
   memory           = 2048
