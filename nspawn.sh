@@ -7,7 +7,7 @@ if [[ $EUID -ne 0 ]]; then echo "This script must be run as root" && exit 1; fi
 CONTAINER_IP=10.10.8.2
 CONTAINER_GW=10.10.8.1
 WAN_IFACE=eth0   # $(route -n| grep '^default' | grep -o '[^ ]*$')
-WAN_IFACE=enp9s0 # $(route -n| grep '^default' | grep -o '[^ ]*$')
+# WAN_IFACE=enp9s0 # $(route -n| grep '^default' | grep -o '[^ ]*$')
 
 CONTAINER_PASSWD="vagrant"
 CONTAINER_HOSTNAME="pve.local"
@@ -154,6 +154,9 @@ function provision() {
     parted -s "$rds1_dev" mklabel gpt || parted -s "$rds1_dev" mklabel gpt # first call sometime fails (!?)
     parted -s -a optimal "$rds1_dev" mkpart primary 0% 100%
 
+    sync
+    wait 1
+        
     echo -n "$rds1_password" | cryptsetup luksFormat "${rds1_dev}p1" -
     echo -n "$rds1_password" | cryptsetup luksOpen "${rds1_dev}p1" rds1_luks -
     openssl genrsa -out "staging/luks.key" 4096
@@ -197,10 +200,10 @@ EOF
 
     sudo -u "$SUDO_USER" bash <<EOF
 echo "Running as $SUDO_USER"
-/home/tom/.local/bin/ansible-galaxy install -r requirements.yml --force
+ansible-galaxy install -r requirements.yml --force
 ruby staging.rb staging/inventory.yml
 rm staging/success
-if /home/tom/.local/bin/ansible-playbook -i staging/inventory.yml playbook-all.yml --extra-vars="domain=staging.local"; then
+if ansible-playbook -i staging/inventory.yml playbook-all.yml --extra-vars="domain=staging.local"; then
   touch staging/success
 fi
 ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP poweroff 
