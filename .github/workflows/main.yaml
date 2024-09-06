@@ -125,39 +125,40 @@ jobs:
         if: always()
       ################
 
-      # - name: Install dependencies
-      #   run: sudo apt-get install -y cloud-utils libvirt-dev
+      - name: Install dependencies
+        run: sudo apt-get install -y cloud-utils libvirt-dev debootstrap
 
-      # - name: Install packer and vagrant
-      #   run: |
-      #     wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-      #     echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-      #     sudo apt-get update -y
-      #     sudo apt-get install -y packer vagrant
+      - name: Install packer and vagrant
+        run: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update -y
+          sudo apt-get install -y packer vagrant
 
-      # - name: Setup vagrant plugin and binfmt
-      #   run: |
-      #     vagrant plugin install vagrant-libvirt
-      #     sudo apt-get reinstall -y qemu-user-static
-      #     sudo pip3 install passlib --break-system-packages # python3-passlib didn't work
+      - name: Setup vagrant plugin and binfmt
+        run: |
+          vagrant plugin install vagrant-libvirt
+          sudo apt-get reinstall -y qemu-user-static
+          sudo pip3 install passlib --break-system-packages # python3-passlib didn't work
 
-      # - name: Stats
-      #   run: df -H
+      - name: Stats
+        run: df -H
 
-      # - name: Create proxmox/router image
-      #   run: |
-      #     (
-      #       cd images
-      #       time make opnsense.qcow2
-      #     ) &
-      #     (
-      #       cd proxmox
-      #       time make build-libvirt
-      #       vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
-      #       make clean
-      #       rm -rf *.box
-      #     ) & wait
-      #   if: always()
+      - name: Create proxmox/router image
+        run: |
+          (
+            cd images
+            time make opnsense.qcow2
+          ) 
+          # &
+          # (
+          #   cd proxmox
+          #   time make build-libvirt
+          #   vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
+          #   make clean
+          #   rm -rf *.box
+          # ) & wait
+        if: always()
 
       # - name: Build opnsense image
       #   working-directory: images
@@ -165,33 +166,30 @@ jobs:
       #     make opnsense.qcow2
       #   if: always()
 
-      # - name: Build bos image
-      #   working-directory: images
-      #   run: time make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
-      #   if: always()
+      - name: Build bos image
+        working-directory: images
+        run: time make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
+        if: always()
 
-      # - name: Build cos image
-      #   working-directory: images
-      #   run: time make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
-      #   if: always()
+      - name: Build cos image
+        working-directory: images
+        run: time make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
+        if: always()
 
-      # - name: Clean up image
-      #   working-directory: images
-      #   run: |
-      #     # make all -j
-      #     # make cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar bos.x86_64.qcow2 bos.aarch64.qcow2 opnsense.qcow2
-      #     time rm -rf *.iso
-      #   if: always()
-
-      # - name: Stats
-      #   run: df -H
-      #   if: always()
+      - name: Clean up image
+        working-directory: images
+        run: |
+          # make all -j
+          # make cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar bos.x86_64.qcow2 bos.aarch64.qcow2 opnsense.qcow2
+          time rm -rf *.iso
+        if: always()
 
       - name: Stats
         run: df -H
+        if: always()
 
-      # - name: Run provision
-      #   run: vagrant up
+      - name: Run provision
+        run: sudo ./nspawn.sh
 
       - name: Stats
         run: df -H

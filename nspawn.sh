@@ -149,14 +149,16 @@ function provision() {
     rm -rf "$rds1_disk"
     qemu-img create -f qcow2 "$rds1_disk" 1G
     modprobe nbd
+
+    qemu-nbd --disconnect "$rds1_dev"
     qemu-nbd --connect="$rds1_dev" "$rds1_disk"
 
     parted -s "$rds1_dev" mklabel gpt || parted -s "$rds1_dev" mklabel gpt # first call sometime fails (!?)
     parted -s -a optimal "$rds1_dev" mkpart primary 0% 100%
 
     sync
-    wait 1
-        
+    sleep 1
+
     echo -n "$rds1_password" | cryptsetup luksFormat "${rds1_dev}p1" -
     echo -n "$rds1_password" | cryptsetup luksOpen "${rds1_dev}p1" rds1_luks -
     openssl genrsa -out "staging/luks.key" 4096
@@ -200,10 +202,10 @@ EOF
 
     sudo -u "$SUDO_USER" bash <<EOF
 echo "Running as $SUDO_USER"
-ansible-galaxy install -r requirements.yml --force
+/opt/pipx_bin/ansible-galaxy install -r requirements.yml --force
 ruby staging.rb staging/inventory.yml
 rm staging/success
-if ansible-playbook -i staging/inventory.yml playbook-all.yml --extra-vars="domain=staging.local"; then
+if /opt/pipx_bin/ansible-playbook -i staging/inventory.yml playbook-all.yml --extra-vars="domain=staging.local"; then
   touch staging/success
 fi
 ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP poweroff 
@@ -232,10 +234,10 @@ else
   apt-get install -y proxmox-ve postfix open-iscsi chrony
   rm -rf /etc/apt/sources.list.d/pve-enterprise.list
 fi
-poweroff
+reboot
 EOF
   provision
-) &
+) & 
 wait
 
 echo "All Done"
