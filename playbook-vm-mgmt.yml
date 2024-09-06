@@ -6,6 +6,7 @@
     - include_tasks: tasks/setup_proxmox_api.yml
     - include_tasks: tasks/setup_backup_dir.yml
     - include_tasks: tasks/copy_bos_image.yml
+      vars: { arch: x86_64 }
 
     - name: Backup LUKS key
       ansible.builtin.fetch:
@@ -25,6 +26,19 @@
       args:
         chdir: /var/lib/vz/template/
 
+    - name: Check if rds is a qcow2 image for import
+      command: file "{{mgmt_rds_disk}}"
+      register: mgmt_rds_file_type
+      changed_when: false
+
+    - set_fact:
+        rds1_disk_spec: "{{storage_pool}}:0,import-from={{mgmt_rds_disk}},format=qcow2,serial=rds1"
+      when: "'QEMU QCOW Image' in mgmt_rds_file_type.stdout"
+
+    - set_fact:
+        rds1_disk_spec: "{{mgmt_rds_disk}},serial=rds1"
+      when: "'QEMU QCOW Image' not in mgmt_rds_file_type.stdout"
+
     - include_tasks: tasks/pve_create_vm.yml
       vars:
         vm_name: "mgmt.{{domain}}"
@@ -39,8 +53,8 @@
         vm_net:
           net0: "virtio,bridge=vmbr1"
         vm_scsi:
-          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{mgmt_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
-          scsi1: "/dev/disk/by-id/{{mgmt_rds_disk_id}},serial=rds1"
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{mgmt_disk_size}}.qcow2,format=qcow2,cache=none,ssd=1,discard=on"
+          scsi1: "{{rds1_disk_spec}}"
 
     - include_tasks: tasks/pve_vm_state.yml
       vars: { vm_name: "mgmt.{{domain}}", vm_state: started }

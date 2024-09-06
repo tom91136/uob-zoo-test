@@ -5,6 +5,7 @@
   tasks:
     - include_tasks: tasks/setup_proxmox_api.yml
     - include_tasks: tasks/copy_bos_image.yml
+      vars: { arch: x86_64 }
 
     - name: Copy idm BOS image
       ansible.builtin.copy:
@@ -32,7 +33,7 @@
         vm_net:
           net0: "virtio,bridge=vmbr1"
         vm_scsi:
-          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{idm_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/bos.x86_64.{{idm_disk_size}}.qcow2,format=qcow2,cache=none,ssd=1,discard=on"
 
     - include_tasks: tasks/pve_vm_state.yml
       vars: { vm_name: "idm.{{domain}}", vm_state: started }

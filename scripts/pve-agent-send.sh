@@ -9,8 +9,7 @@ fi
 source="$1"
 dest="$2"
 vmid="$3"
-host="${4:-$(hostname)}"
-chunk_size="${5:-1200}"
+chunk_size="${4:-1200}"
 if [ ! -f "$source" ]; then echo "Source file not found: $source" && exit 1; fi
 checksum="$(sha256sum <"$source" | cut -d" " -f1)"
 set +e
@@ -24,7 +23,7 @@ echo "Sending $source ($content_length chars) as $total_chunks chunk(s)..."
 for ((i = 0; i < content_length; i += chunk_size)); do
     chunk="${content:i:$chunk_size}"
     chunk_id=$((chunk_id + 1))
-    pvesh create "/nodes/$host/qemu/$vmid/agent/file-write" --file "$dest.$chunk_id" --content "$chunk"
+    pvesh create "/nodes/localhost/qemu/$vmid/agent/file-write" --file "$dest.$chunk_id" --content "$chunk"
     printf "\r%3d%% [%s]" "$((chunk_id * 100 / total_chunks))" "$(printf '%0.s#' $(seq 1 $chunk_id))"
 done
 

@@ -7,6 +7,8 @@
   tasks:
     - include_tasks: tasks/setup_proxmox_api.yml
     - include_tasks: tasks/copy_bos_image.yml
+      vars: { arch: "{{item}}" }
+      loop: [x86_64, aarch64]
 
     - name: Copy login BOS image
       ansible.builtin.copy:

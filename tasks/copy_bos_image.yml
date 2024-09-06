@@ -1,6 +1,5 @@
 - name: Copy BOS image template
   ansible.builtin.copy:
-    src: images/bos.{{item}}.qcow2
-    dest: /var/lib/vz/template/bos.{{item}}.qcow2
+    src: images/bos.{{arch}}.qcow2
+    dest: /var/lib/vz/template/bos.{{arch}}.qcow2
     force: false
-  loop: [x86_64, aarch64]  

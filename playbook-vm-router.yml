@@ -36,7 +36,7 @@
           net2: "virtio,bridge=vmbr2"
         scsihw: "virtio-scsi-single"
         scsi:
-          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/opnsense.amd64.{{router_disk_size}}.qcow2,format=qcow2,iothread=1,cache=none,ssd=1,discard=on"
+          scsi0: "{{storage_pool}}:0,import-from=/var/lib/vz/template/opnsense.amd64.{{router_disk_size}}.qcow2,format=qcow2,cache=none,ssd=1,discard=on"
 
     - include_tasks: tasks/pve_vm_state.yml
       vars: { vm_name: "router.{{domain}}", vm_state: started }
