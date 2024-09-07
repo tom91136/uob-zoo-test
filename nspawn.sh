@@ -208,7 +208,7 @@ EOF
 boot)
   check_root
   chown "$SUDO_USER:$SUDO_USER" staging
-  nohup bash -c nspawn_boot &> stating/boot.out &
+  nohup bash -c nspawn_boot &> staging/boot.out &
 
   sleep 10
   scp -i "$SSH_IDENTITY" -o StrictHostKeychecking=no scripts/nspawn-provision.sh root@$CONTAINER_IP:/root/provision.sh

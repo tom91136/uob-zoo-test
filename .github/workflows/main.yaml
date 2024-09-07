@@ -169,7 +169,7 @@ jobs:
         run: df -H
         if: always()
 
-      - name: Run setup-testson
+      - name: Run setup-tests
         run: ./nspawn.sh setup-tests
         if: always()
 
@@ -187,10 +187,6 @@ jobs:
 
       - name: Run boot
         run: sudo ./nspawn.sh boot
-        if: always()
-
-      - name: Run provision
-        run: ./nspawn.sh run-play
         if: always()
 
       - name: Run provision playbook-vm-router
@@ -241,7 +237,11 @@ jobs:
         run: ./nspawn.sh run-play playbook-task-tests.yml
         if: always()
 
-      - name: Run provision
+      - name: Run provision all
+        run: ./nspawn.sh run-play playbook-all.yml
+        if: always()
+
+      - name: Run poweroff
         run: ./nspawn.sh poweroff
         if: always()
 
