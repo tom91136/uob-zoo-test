@@ -123,6 +123,7 @@ jobs:
           chmod 700 ~/.ssh
           chmod 600 ~/.ssh/authorized_keys
         if: always()
+
       ################
 
       - name: Install dependencies
@@ -139,37 +140,110 @@ jobs:
         run: |
           vagrant plugin install vagrant-libvirt
           sudo apt-get reinstall -y qemu-user-static
-          # sudo pip3 install passlib --break-system-packages # python3-passlib didn't work
+          pipx inject ansible-core passlib
 
       - name: Stats
         run: df -H
 
-      # - name: Create opnsense image
-      #   working-directory: images
-      #   run: make opnsense.qcow2
-      #   if: always()
+      - name: Create opnsense image
+        working-directory: images
+        run: make opnsense.qcow2
+        if: always()
 
-      # - name: Build bos images
-      #   working-directory: images
-      #   run: make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
-      #   if: always()
+      - name: Build bos images
+        working-directory: images
+        run: make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
+        if: always()
 
-      # - name: Build cos images
-      #   working-directory: images
-      #   run: make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
-      #   if: always()
+      - name: Build cos images
+        working-directory: images
+        run: make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
+        if: always()
 
-      # - name: Clean up image
-      #   working-directory: images
-      #   run: rm -rf *.iso
-      #   if: always()
+      - name: Clean up image
+        working-directory: images
+        run: rm -rf *.iso
+        if: always()
 
       - name: Stats
         run: df -H
         if: always()
 
-      # - name: Run provision
-      #   run: sudo ./nspawn.sh
+      - name: Run setup-testson
+        run: ./nspawn.sh setup-tests
+        if: always()
+
+      - name: Run build
+        run: sudo ./nspawn.sh build
+        if: always()
+
+      - name: Run mkfs
+        run: sudo ./nspawn.sh mkfs
+        if: always()
+
+      - name: Run provision
+        run: sudo ./nspawn.sh provision
+        if: always()
+
+      - name: Run boot
+        run: sudo ./nspawn.sh boot
+        if: always()
+
+      - name: Run provision
+        run: ./nspawn.sh run-play
+        if: always()
+
+      - name: Run provision playbook-vm-router
+        run: ./nspawn.sh run-play playbook-vm-router.yml
+        if: always()
+
+      - name: Run provision playbook-vm-idm
+        run: ./nspawn.sh run-play playbook-vm-idm.yml
+        if: always()
+
+      - name: Run provision playbook-vm-mgmt
+        run: ./nspawn.sh run-play playbook-vm-mgmt.yml
+        if: always()
+
+      - name: Run provision playbook-vm-login
+        run: ./nspawn.sh run-play playbook-vm-login.yml
+        if: always()
+
+      - name: Run provision playbook-svc-idm
+        run: ./nspawn.sh run-play playbook-svc-idm.yml
+        if: always()
+
+      - name: Run provision playbook-svc-mgmt
+        run: ./nspawn.sh run-play playbook-svc-mgmt.yml
+        if: always()
+
+      - name: Run provision playbook-task-sync-images
+        run: ./nspawn.sh run-play playbook-task-sync-images.yml
+        if: always()
+
+      - name: Run provision playbook-task-sync-nodes
+        run: ./nspawn.sh run-play playbook-task-sync-nodes.yml
+        if: always()
+
+      - name: Run provision playbook-task-sync-users
+        run: ./nspawn.sh run-play playbook-task-sync-users.yml
+        if: always()
+
+      - name: Run provision playbook-vm-compute
+        run: ./nspawn.sh run-play playbook-vm-compute.yml
+        if: always()
+
+      - name: Run provision playbook-svc-login
+        run: ./nspawn.sh run-play playbook-svc-login.yml
+        if: always()
+
+      - name: Run provision playbook-task-tests
+        run: ./nspawn.sh run-play playbook-task-tests.yml
+        if: always()
+
+      - name: Run provision
+        run: ./nspawn.sh poweroff
+        if: always()
 
       - name: Stats
         run: df -H

@@ -2,24 +2,53 @@
 
 set -eux
 
-if [[ $EUID -ne 0 ]]; then echo "This script must be run as root" && exit 1; fi
+WAN_IFACE=${WAN_IFACE:-"eth0"}
 
-CONTAINER_IP=10.10.8.2
-CONTAINER_GW=10.10.8.1
-WAN_IFACE=eth0   # $(route -n| grep '^default' | grep -o '[^ ]*$')
-# WAN_IFACE=enp9s0 # $(route -n| grep '^default' | grep -o '[^ ]*$')
+export CONTAINER_IP=10.10.8.2
+export CONTAINER_GW=10.10.8.1
+export CONTAINER_PASSWD="vagrant"
+export CONTAINER_HOSTNAME="pve.local"
+export CONTAINER_NAME="proxmox"
+export DEBIAN_VERSION="bookworm"
 
-CONTAINER_PASSWD="vagrant"
-CONTAINER_HOSTNAME="pve.local"
-CONTAINER_NAME="proxmox"
-DEBIAN_VERSION="bookworm"
-USER_HOME="$(eval echo "~$SUDO_USER")"
-SSH_PUBKEY_LINE=$(cat "$USER_HOME/.ssh/id_ed25519.pub")
-SSH_IDENTITY="$USER_HOME/.ssh/id_ed25519"
+USER_HOME=$([ "$EUID" -eq 0 ] && eval echo "~$SUDO_USER" || echo "$HOME")
+export SSH_PUBKEY_LINE=$(cat "$USER_HOME/.ssh/id_ed25519.pub")
+export SSH_IDENTITY="$USER_HOME/.ssh/id_ed25519"
+
+export VZ_DISK_SIZE=40G
+export VZ_IMAGE=staging/vz.btrfs
+export VZ_MOUNT=staging/vz_mount
+export RDS1_DISK=staging/rds1.xfs.qcow2
+export RDS1_KEY="staging/luks.key"
+export RDS1_PASS="vagrant"
+export RDS1_DEV="/dev/nbd0"
+
+function check_root() {
+  if [[ $EUID -ne 0 ]]; then echo "This script must be run as root" && exit 1; fi
+}
+
+function nspawn_boot() {
+  if ! mount | grep -q "$VZ_MOUNT" || true; then
+    echo "Mounting $VZ_IMAGE to $VZ_MOUNT..."
+    mount -o loop,compress-force=zstd "$VZ_IMAGE" "$VZ_MOUNT" || true
+  else
+    echo "$VZ_MOUNT is already mounted."
+  fi
+  systemd-nspawn -b -D "staging/$CONTAINER_NAME" --network-veth --hostname="$CONTAINER_HOSTNAME" \
+    --property DeviceAllow='/dev/fuse rwm' \
+    --bind=/dev/kvm \
+    --bind="$PWD/$RDS1_KEY:/boot/luks.key" \
+    --bind="$PWD/$VZ_MOUNT:/var/lib/vz/images" \
+    --bind="$PWD/$RDS1_DISK:/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_rds1" \
+    --console=read-only
+}
+export -f nspawn_boot
 
 mkdir -p staging
 
-if [ "${1:-}" != "skip-build" ]; then
+case "${1:-}" in
+build)
+  check_root
   if [ ! -d "staging/$CONTAINER_NAME" ]; then
     debootstrap "$DEBIAN_VERSION" "staging/$CONTAINER_NAME" http://deb.debian.org/debian
   fi
@@ -31,7 +60,6 @@ Driver=veth
 
 [Network]
 Address=$CONTAINER_GW/24    
-# LinkLocalAddressing=yes
 DHCPServer=yes
 IPMasquerade=ipv4
 
@@ -120,110 +148,48 @@ echo "root:$CONTAINER_PASSWD" | chpasswd
 ln -sf /lib/systemd/system/systemd-networkd.service /etc/systemd/system/multi-user.target.wants/systemd-networkd.service
 ln -sf /etc/systemd/system/create-fuse-node.service /etc/systemd/system/sysinit.target.wants/create-fuse-node.service
 echo "nameserver 1.1.1.1" > /etc/resolv.conf
-
-# apt-get install -y proxmox-ve postfix open-iscsi chrony || true 
-# ip addr add $CONTAINER_IP/24 dev host0
-# ip route add default via $CONTAINER_GW
 EOF
-else
-  echo "Skipping build"
-fi
-
-function provision() {
-  size=40G
-  vz_image=staging/vz.btrfs
-  vz_mount=staging/vz_mount
+  ;;
+mkfs)
+  check_root
   (
-    rm -rf "$vz_image"
-    truncate -s $size "$vz_image"
-    mkfs.btrfs "$vz_image"
-    mkdir -p "$vz_mount"
-    mount -o loop,compress-force=zstd "$vz_image" "$vz_mount"
-    fstrim -v "$vz_mount"
+    rm -rf "$VZ_IMAGE"
+    truncate -s $VZ_DISK_SIZE "$VZ_IMAGE"
+    mkfs.btrfs "$VZ_IMAGE"
+    mkdir -p "$VZ_MOUNT"
+    mount -o loop,compress-force=zstd "$VZ_IMAGE" "$VZ_MOUNT"
+    fstrim -v "$VZ_MOUNT"
+    umount "$VZ_MOUNT"
   )
-
-  rds1_disk=staging/rds1.xfs.qcow2
-  rds1_password="vagrant"
-  rds1_dev="/dev/nbd0"
   (
-    rm -rf "$rds1_disk"
-    qemu-img create -f qcow2 "$rds1_disk" 1G
+    rm -rf "$RDS1_DISK"
+    qemu-img create -f qcow2 "$RDS1_DISK" 1G
     modprobe nbd
+    qemu-nbd --disconnect "$RDS1_DEV"
+    qemu-nbd --connect="$RDS1_DEV" "$RDS1_DISK"
 
-    qemu-nbd --disconnect "$rds1_dev"
-    qemu-nbd --connect="$rds1_dev" "$rds1_disk"
-
-    parted -s "$rds1_dev" mklabel gpt || parted -s "$rds1_dev" mklabel gpt # first call sometime fails (!?)
-    parted -s -a optimal "$rds1_dev" mkpart primary 0% 100%
+    parted -s "$RDS1_DEV" mklabel gpt || parted -s "$RDS1_DEV" mklabel gpt # first call sometime fails (!?)
+    parted -s -a optimal "$RDS1_DEV" mkpart primary 0% 100%
 
     sync
     sleep 1
 
-    echo -n "$rds1_password" | cryptsetup luksFormat "${rds1_dev}p1" -
-    echo -n "$rds1_password" | cryptsetup luksOpen "${rds1_dev}p1" rds1_luks -
-    openssl genrsa -out "staging/luks.key" 4096
-    echo -n "$rds1_password" | cryptsetup luksAddKey "${rds1_dev}p1" "staging/luks.key" -
+    echo -n "$RDS1_PASS" | cryptsetup luksFormat "${RDS1_DEV}p1" -
+    echo -n "$RDS1_PASS" | cryptsetup luksOpen "${RDS1_DEV}p1" rds1_luks -
+    openssl genrsa -out "$RDS1_KEY" 4096
+    echo -n "$RDS1_PASS" | cryptsetup luksAddKey "${RDS1_DEV}p1" "$RDS1_KEY" -
     mkfs.xfs /dev/mapper/rds1_luks
     cryptsetup luksClose rds1_luks
 
-    qemu-nbd --disconnect "$rds1_dev"
+    qemu-nbd --disconnect "$RDS1_DEV"
   )
-
-  trap cleanup INT
-  cleanup() {
-    umount "$vz_mount" || true
-    rm -rf "$vz_mount" || true
-  }
-  PROVISION_SCRIPT=scripts/nspawn-provision.sh
-  (
-    systemd-nspawn -b -D "staging/$CONTAINER_NAME" --network-veth --hostname="$CONTAINER_HOSTNAME" \
-      --property DeviceAllow='/dev/fuse rwm' \
-      --bind=/dev/kvm \
-      --bind="$PWD/staging/luks.key:/boot/luks.key" \
-      --bind="$PWD/$vz_mount:/var/lib/vz/images" \
-      --bind="$PWD/$rds1_disk:/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_rds1" \
-      --console=read-only #
-  ) &
+  ;;
+provision)
+  check_root
+  nspawn_boot &
   (
     sleep 10
-    # ip route add 10.10.10.0/24 via 10.10.8.1
-    scp -i "$SSH_IDENTITY" -o StrictHostKeychecking=no $PROVISION_SCRIPT root@$CONTAINER_IP:/root/provision.sh
-    # shellcheck disable=SC2087
-    ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP bash <<EOF
-set -eux
-echo "nameserver 1.1.1.1" > /etc/resolv.conf
-export DEBIAN_FRONTEND=noninteractivec
-bash \$HOME/provision.sh $CONTAINER_IP $CONTAINER_GW
-systemctl restart networking
-echo "Provision complete"
-EOF
-
-    chown "$SUDO_USER:$SUDO_USER" staging
-
-    sudo -u "$SUDO_USER" bash <<EOF
-echo "Running as $SUDO_USER"
-/opt/pipx_bin/ansible-galaxy install -r requirements.yml --force
-ruby staging.rb staging/inventory.yml
-rm staging/success
-if /opt/pipx_bin/ansible-playbook -i staging/inventory.yml playbook-all.yml --extra-vars="domain=staging.local"; then
-  touch staging/success
-fi
-ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP poweroff 
-EOF
-  ) &
-  wait
-  cleanup
-}
-
-(
-  systemd-nspawn -b -D "staging/$CONTAINER_NAME" --network-veth --hostname="$CONTAINER_HOSTNAME" \
-    --property DeviceAllow='/dev/fuse rwm' \
-    --bind=/dev/kvm \
-    --console=read-only #
-) &
-(
-  sleep 10
-  ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP bash <<'EOF'
+    ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP bash <<'EOF'
 set -eux
 echo "nameserver 1.1.1.1" > /etc/resolv.conf
 export DEBIAN_FRONTEND=noninteractivec
@@ -234,15 +200,36 @@ else
   apt-get install -y proxmox-ve postfix open-iscsi chrony
   rm -rf /etc/apt/sources.list.d/pve-enterprise.list
 fi
-reboot
+poweroff
 EOF
-  provision
-) & 
-wait
+  ) &
+  wait
+  ;;
+boot)
+  check_root
+  chown "$SUDO_USER:$SUDO_USER" staging
+  nohup bash -c nspawn_boot &> stating/boot.out &
 
-echo "All Done"
-
-if [ ! -f "staging/success" ]; then
-  echo "Provision failed: no success found"
-  exit 1
-fi
+  sleep 10
+  scp -i "$SSH_IDENTITY" -o StrictHostKeychecking=no scripts/nspawn-provision.sh root@$CONTAINER_IP:/root/provision.sh
+  # shellcheck disable=SC2087
+  ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP bash <<EOF
+set -eux
+echo "nameserver 1.1.1.1" > /etc/resolv.conf
+export DEBIAN_FRONTEND=noninteractivec
+bash \$HOME/provision.sh "$CONTAINER_IP" "$CONTAINER_GW"
+systemctl restart networking
+EOF
+  ;;
+poweroff)
+  ssh -i "$SSH_IDENTITY" -o StrictHostKeychecking=no root@$CONTAINER_IP poweroff
+  ;;
+setup-tests)
+  ansible-galaxy install -r requirements.yml --force
+  ruby staging.rb staging/inventory.yml
+  ;;
+run-play)
+  play=$2
+  ansible-playbook -i staging/inventory.yml "$play" --extra-vars="domain=staging.local"
+  ;;
+esac
