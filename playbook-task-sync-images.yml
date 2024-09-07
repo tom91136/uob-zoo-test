@@ -14,14 +14,14 @@
         wwctl container import "/root/cos.{{item}}.warewulf.tar" "cos_{{item}}" --force --syncuser || \
         wwctl container import "/root/cos.{{item}}.warewulf.tar" "cos_{{item}}" --force --syncuser
       loop: "{{all_arch}}"
-      async: 120
+      async: 600
       poll: 0
       register: _cos_import
 
     - name: Wait for COS image import
       async_status: { jid: "{{item.ansible_job_id}}" }
       register: _jobs_cos_import
-      retries: 120
+      retries: 600
       delay: 1
       until: _jobs_cos_import.finished
       loop: "{{_cos_import.results}}"

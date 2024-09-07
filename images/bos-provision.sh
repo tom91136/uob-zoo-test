@@ -19,4 +19,6 @@ cat <<EOF >/etc/resolv.conf
 nameserver 1.1.1.1
 EOF
 
+fstrim -av
+
 touch "/.autorelabel"

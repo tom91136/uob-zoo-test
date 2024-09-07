@@ -14,4 +14,6 @@ qemu_guest_agent_enable="YES"
 qemu_guest_agent_flags="-d -v -l /var/log/qemu-ga.log"
 EOF
 
+fsck_ffs -E
+
 touch /.probe.for.growfs

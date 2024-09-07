@@ -24,6 +24,12 @@
         chdir: /var/lib/vz/template/
       loop: [x86_64, aarch64]
 
+    - name: Delete BOS templates
+      ansible.builtin.file:
+        path: "/var/lib/vz/template/bos.{{item}}.qcow2"
+        state: absent
+      loop: [x86_64, aarch64]
+
     - include_tasks: tasks/pve_create_vm.yml
       vars:
         vm_name: "login-{{arch_to_dns_map[item]}}.{{domain}}"
