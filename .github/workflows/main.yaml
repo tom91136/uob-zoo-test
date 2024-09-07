@@ -139,57 +139,37 @@ jobs:
         run: |
           vagrant plugin install vagrant-libvirt
           sudo apt-get reinstall -y qemu-user-static
-          sudo pip3 install passlib --break-system-packages # python3-passlib didn't work
+          # sudo pip3 install passlib --break-system-packages # python3-passlib didn't work
 
       - name: Stats
         run: df -H
 
-      - name: Create proxmox/router image
-        run: |
-          (
-            cd images
-            time make opnsense.qcow2
-          ) 
-          # &
-          # (
-          #   cd proxmox
-          #   time make build-libvirt
-          #   vagrant box add -f proxmox-ve-amd64 proxmox-ve-amd64-libvirt.box.json
-          #   make clean
-          #   rm -rf *.box
-          # ) & wait
-        if: always()
-
-      # - name: Build opnsense image
+      # - name: Create opnsense image
       #   working-directory: images
-      #   run: |
-      #     make opnsense.qcow2
+      #   run: make opnsense.qcow2
       #   if: always()
 
-      - name: Build bos image
-        working-directory: images
-        run: time make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
-        if: always()
+      # - name: Build bos images
+      #   working-directory: images
+      #   run: make bos.x86_64.qcow2  cos.x86_64.warewulf.tar -j
+      #   if: always()
 
-      - name: Build cos image
-        working-directory: images
-        run: time make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
-        if: always()
+      # - name: Build cos images
+      #   working-directory: images
+      #   run: make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
+      #   if: always()
 
-      - name: Clean up image
-        working-directory: images
-        run: |
-          # make all -j
-          # make cos.x86_64.warewulf.tar cos.aarch64.warewulf.tar bos.x86_64.qcow2 bos.aarch64.qcow2 opnsense.qcow2
-          time rm -rf *.iso
-        if: always()
+      # - name: Clean up image
+      #   working-directory: images
+      #   run: rm -rf *.iso
+      #   if: always()
 
       - name: Stats
         run: df -H
         if: always()
 
-      - name: Run provision
-        run: sudo ./nspawn.sh
+      # - name: Run provision
+      #   run: sudo ./nspawn.sh
 
       - name: Stats
         run: df -H
