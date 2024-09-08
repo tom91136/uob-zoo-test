@@ -146,6 +146,11 @@ jobs:
         run: make bos.aarch64.qcow2 cos.aarch64.warewulf.tar -j
         if: always()
 
+      - name: Image stats
+        working-directory: images
+        run: tree --du -h
+        if: always()
+
       - name: Clean up image
         working-directory: images
         run: rm -rf *.iso AlmaLinux*.qcow2 output-*
