@@ -255,18 +255,8 @@ jobs:
 
       - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
 
-      - name: Run provision all
-        run: ./nspawn.sh run-play playbook-all.yml
-        if: always()
-
-      - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
-
       - name: Run poweroff
         run: ./nspawn.sh poweroff
         if: always()
 
       - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
-
-      - name: Wait for SSH
-        run: sleep infinity
-        if: always()
