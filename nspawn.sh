@@ -17,11 +17,15 @@ export SSH_IDENTITY="$USER_HOME/.ssh/id_ed25519"
 
 export VZ_DISK_SIZE=40G
 export VZ_IMAGE=staging/vz.btrfs
+export VZ_OPTS="loop,compress-force=zstd"
 export VZ_MOUNT=staging/vz_mount
 export RDS1_DISK=staging/rds1.xfs.qcow2
 export RDS1_KEY="staging/luks.key"
 export RDS1_PASS="vagrant"
 export RDS1_DEV="/dev/nbd0"
+
+export VZ_IMAGE=/mnt/vz.btrfs
+export VZ_OPTS="loop"
 
 function check_root() {
   if [[ $EUID -ne 0 ]]; then echo "This script must be run as root" && exit 1; fi
@@ -30,7 +34,7 @@ function check_root() {
 function nspawn_boot() {
   if ! mount | grep -q "$VZ_MOUNT" || true; then
     echo "Mounting $VZ_IMAGE to $VZ_MOUNT..."
-    mount -o loop,compress-force=zstd "$VZ_IMAGE" "$VZ_MOUNT" || true
+    mount -o $VZ_OPTS "$VZ_IMAGE" "$VZ_MOUNT" || true
   else
     echo "$VZ_MOUNT is already mounted."
   fi
