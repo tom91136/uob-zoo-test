@@ -1,9 +1,9 @@
 name: CI
 on: [push]
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-#   cancel-in-progress: true
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -73,39 +73,6 @@ jobs:
 
       - name: Generate keys
         run: ssh-keygen -t ed25519 -N "" -f $HOME/.ssh/id_ed25519
-        if: always()
-
-      ################
-
-      - name: Tailscale
-        uses: tailscale/github-action@v2
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:example
-        if: always()
-
-      - name: Install tools
-        run: |
-          sudo apt-get install -y tmux micro dstat nload
-          cd
-          git clone https://github.com/gpakosz/.tmux.git
-          ln -s -f .tmux/.tmux.conf
-          cp .tmux/.tmux.conf.local .
-        if: always()
-
-      - name: Wait for SSH
-        run: |
-          sudo sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g' /etc/ssh/sshd_config
-          sudo systemctl restart ssh
-           
-          mkdir -p $HOME/.ssh
-          touch $HOME/.ssh/authorized_keys 
-          printf "%s\n" "${{ secrets.PUBLIC_KEY }}" >> $HOME/.ssh/authorized_keys
-          sudo chown runner:runner $HOME/.ssh/authorized_keys
-          chmod go-w ~/
-          chmod 700 ~/.ssh
-          chmod 600 ~/.ssh/authorized_keys
         if: always()
 
       ################
