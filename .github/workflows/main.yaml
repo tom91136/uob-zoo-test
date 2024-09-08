@@ -242,20 +242,26 @@ jobs:
 
       - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
 
-      - name: Run provision playbook-vm-compute
-        run: ./nspawn.sh run-play playbook-vm-compute.yml
-        if: always()
-
-      - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
-
       - name: Run provision playbook-svc-login
         run: ./nspawn.sh run-play playbook-svc-login.yml
         if: always()
 
       - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
 
+      - name: Run provision playbook-vm-compute
+        run: ./nspawn.sh run-play playbook-vm-compute.yml
+        if: always()
+
+      - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
+
       - name: Run provision playbook-task-tests
         run: ./nspawn.sh run-play playbook-task-tests.yml
+        if: always()
+
+      - { name: Stats, run: df -H && sudo fstrim -av, if: always() }
+
+      - name: Run provision playbook-all
+        run: ./nspawn.sh run-play playbook-all.yml
         if: always()
 
       - { name: Stats, run: df -H && sudo fstrim -av, if: always() }

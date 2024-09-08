@@ -9,7 +9,7 @@
 - import_playbook: playbook-task-sync-images.yml
 - import_playbook: playbook-task-sync-nodes.yml
 - import_playbook: playbook-task-sync-users.yml
-- import_playbook: playbook-vm-compute.yml
 
 - import_playbook: playbook-svc-login.yml
+- import_playbook: playbook-vm-compute.yml
 - import_playbook: playbook-task-tests.yml

@@ -75,9 +75,9 @@ Vagrant.configure(2) do |config|
   ansible_provision(config, 'task-sync-images', Staging.common_vars(STORAGE_POOL))
   ansible_provision(config, 'task-sync-nodes', Staging.common_vars(STORAGE_POOL))
   ansible_provision(config, 'task-sync-users', Staging.common_vars(STORAGE_POOL))
-  ansible_provision(config, 'vm-compute', Staging.common_vars(STORAGE_POOL))
 
   ansible_provision(config, 'svc-login', Staging.common_vars(STORAGE_POOL))
+  ansible_provision(config, 'vm-compute', Staging.common_vars(STORAGE_POOL))
   ansible_provision(config, 'task-tests', Staging.common_vars(STORAGE_POOL))
 
   ansible_provision(config, 'all', Staging.common_vars(STORAGE_POOL))
